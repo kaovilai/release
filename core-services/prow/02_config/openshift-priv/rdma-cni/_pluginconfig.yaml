@@ -1,0 +1,10 @@
+plugins:
+  openshift-priv/rdma-cni:
+    plugins:
+    - approve
+    - golint
+    - goose
+    - jira
+    - owners-label
+    - pony
+    - sigmention

@@ -36,13 +36,10 @@ external_plugins:
 lgtm:
 - repos:
   - opendatahub-io/modelmesh-serving
-  review_acts_as_lgtm: true
 plugins:
   opendatahub-io/modelmesh-serving:
     plugins:
     - assign
-    - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
@@ -66,3 +63,8 @@ plugins:
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - opendatahub-io/modelmesh-serving
+  trusted_apps:
+  - openshift-merge-bot

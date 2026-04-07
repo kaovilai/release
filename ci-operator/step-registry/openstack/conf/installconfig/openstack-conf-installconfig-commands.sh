@@ -11,7 +11,6 @@ OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPEN
 OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
 ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
-ZONES_COUNT="${ZONES_COUNT:-0}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
 
 API_IP=$(<"${SHARED_DIR}/API_IP")
@@ -21,19 +20,7 @@ PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 IFS=' ' read -ra ZONES <<< "$ZONES"
-MAX_ZONES_COUNT=${#ZONES[@]}
-
-if [ "${ZONES_COUNT}" -gt 1 ]; then
-	# For now, we only support a cluster within a single AZ.
-	# This will change in the future.
-	echo "Wrong ZONE_COUNT: can only be 0 or 1, got ${ZONES_COUNT}"
-	exit 1
-fi
-if [ "${ZONES_COUNT}" -gt "${MAX_ZONES_COUNT}" ]; then
-	echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
-	exit 1
-fi
-
+ZONES_COUNT=${#ZONES[@]}
 ZONES_JSON="$(echo -n "${ZONES[@]:0:${ZONES_COUNT}}" | jq -cRs '(. / " ")')"
 echo "OpenStack Availability Zones: '${ZONES_JSON}'"
 
@@ -68,7 +55,7 @@ sshKey: |-
 EOF
 
 case "$CONFIG_TYPE" in
-	minimal)
+	minimal|dual-stack-upi)
 		yq --yaml-output --in-place ".
 			| .platform.openstack.externalDNS = [\"1.1.1.1\", \"1.0.0.1\"]
 			| .platform.openstack.externalNetwork = \"${OPENSTACK_EXTERNAL_NETWORK}\"
@@ -97,9 +84,53 @@ case "$CONFIG_TYPE" in
 		if [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
     			yq --yaml-output --in-place ".
     			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
-    			    | .featureSet = \"TechPreviewNoUpgrade\"
     			" "$INSTALL_CONFIG"
 		fi
+		;;
+	dualstack*)
+		source "${SHARED_DIR}/VIPS"
+		API_VIPS=$(echo -n "${API_VIPS[@]}" | jq -cRs '(. / " ")')
+		INGRESS_VIPS=$(echo -n "${INGRESS_VIPS[@]}" | jq -cRs '(. / " ")')
+		yq --yaml-output --in-place ".
+			| .networking.machineNetwork[0].cidr = \"${MACHINES_SUBNET_v4_RANGE:?}\"
+			| .networking.machineNetwork[1].cidr = \"${MACHINES_SUBNET_v6_RANGE:?}\"
+			| .networking.clusterNetwork[0].cidr = \"10.128.0.0/14\"
+			| .networking.clusterNetwork[0].hostPrefix = 23
+			| .networking.clusterNetwork[1].cidr = \"fd01::/48\"
+			| .networking.clusterNetwork[1].hostPrefix = 64
+			| .networking.serviceNetwork = [\"172.30.0.0/16\", \"fd02::/112\"]
+			| .platform.openstack.apiVIPs = $API_VIPS
+			| .platform.openstack.ingressVIPs = $INGRESS_VIPS
+			| .platform.openstack.controlPlanePort.fixedIPs[0].subnet.name = \"${CONTROL_PLANE_SUBNET_V4}\"
+			| .platform.openstack.controlPlanePort.fixedIPs[1].subnet.name = \"${CONTROL_PLANE_SUBNET_V6}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+		" "$INSTALL_CONFIG"
+
+		if [[ "${CONFIG_TYPE}" == "dualstack-v6primary" ]]; then
+			yq --yaml-output --in-place ".
+				| .platform.openstack.apiVIPs = (.platform.openstack.apiVIPs | reverse)
+				| .platform.openstack.ingressVIPs = (.platform.openstack.ingressVIPs | reverse)
+				| .networking.machineNetwork = (.networking.machineNetwork | reverse)
+				| .networking.clusterNetwork = (.networking.clusterNetwork | reverse)
+				| .networking.serviceNetwork = (.networking.serviceNetwork | reverse)
+			" "$INSTALL_CONFIG"
+		fi
+		;;
+	singlestackv6*)
+		source "${SHARED_DIR}/VIPS"
+		API_VIPS=$(echo -n "${API_VIPS[@]}" | jq -cRs '(. / " ")')
+		INGRESS_VIPS=$(echo -n "${INGRESS_VIPS[@]}" | jq -cRs '(. / " ")')
+		yq --yaml-output --in-place ".
+			| .networking.machineNetwork[0].cidr = \"${MACHINES_SUBNET_v6_RANGE:?}\"
+			| .networking.clusterNetwork[0].cidr = \"fd01::/48\"
+			| .networking.clusterNetwork[0].hostPrefix = 64
+			| .networking.serviceNetwork = [\"fd02::/112\"]
+			| .platform.openstack.cloud = \"${OS_CLOUD}-ipv6\"
+			| .platform.openstack.apiVIPs = $API_VIPS
+			| .platform.openstack.ingressVIPs = $INGRESS_VIPS
+			| .platform.openstack.controlPlanePort.fixedIPs[0].subnet.name = \"${CONTROL_PLANE_SUBNET_V6}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+		" "$INSTALL_CONFIG"
 		;;
 	*)
 		echo "No valid install config type specified. Please check CONFIG_TYPE"
@@ -109,18 +140,14 @@ esac
 
 if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 	yq --yaml-output --in-place ".
-		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .controlPlane.platform.openstack.zones = ${ZONES_JSON}
+		| .controlPlane.platform.openstack.rootVolume.type = \"tripleo\"
+		| .controlPlane.platform.openstack.rootVolume.size = 30
+		| .controlPlane.platform.openstack.rootVolume.zones = ${ZONES_JSON}
+		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}
-	" "$INSTALL_CONFIG"
-fi
-
-if [[ -f "${SHARED_DIR}/failure_domain.json" ]]; then
-	yq --yaml-output --in-place ".
-		| .controlPlane.platform.openstack += $(<"${SHARED_DIR}/failure_domain.json")
-		| .featureSet = \"TechPreviewNoUpgrade\"
 	" "$INSTALL_CONFIG"
 fi
 
@@ -138,10 +165,67 @@ if [[ ${ADDITIONAL_WORKERS_NETWORKS:-} != "" ]]; then
 fi
 
 if [ "${FIPS_ENABLED:-}" = "true" ]; then
+	# Since CI does not run with FIPS mode enabled, disable checking for it in openshift-install
+	export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 	echo "Adding 'fips: true' to install-config.yaml"
 	yq --yaml-output --in-place ".
 		| .fips = true
 	" "$INSTALL_CONFIG"
+fi
+
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ${FEATURE_SET}' to install-config.yaml"
+	yq --yaml-output --in-place ".
+		| .featureSet = \"${FEATURE_SET}\"
+	" "$INSTALL_CONFIG"
+fi
+
+if [ -n "${FEATURE_GATES}" ]; then
+	IFS=',' read -ra gates <<< "$FEATURE_GATES"
+	for gate in "${gates[@]}"; do
+		echo "Adding feature gate '${gate}' to install-config.yaml"
+		yq --yaml-output --in-place ".
+			| .featureGates +=  [\"${gate}\"]
+		" "$INSTALL_CONFIG"
+	done
+fi
+
+if [[ -n "${OVERRIDE_OPENSHIFT_SDN_DEPRECATION:-}" ]]; then
+        # Needed for 4.15+; see ci-operator/step-registry/sdn/conf/sdn-conf-commands.sh
+        cat > "${SHARED_DIR}/manifest_cluster-network-02-config.yml" << EOF
+apiVersion: config.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+EOF
+        yq --yaml-output --in-place ".
+		| .networking.networkType = \"OVNKubernetes\"
+	" "$INSTALL_CONFIG"
+fi
+
+# Add an additional security group, in case it exists, to the compute nodes
+if test -f "${SHARED_DIR}/securitygroups"; then
+	yq --yaml-output --in-place ".
+		| .compute[0].platform.openstack.additionalSecurityGroupIDs += [ \"$(<"${SHARED_DIR}"/securitygroups)\" ]
+	" "$INSTALL_CONFIG"
+fi
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the OpenStack endpoint. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # Regenerate install-config.yaml to fill in unset values with default values.
@@ -163,15 +247,3 @@ if "proxy" in data:
     data["proxy"] = "redacted"
 print(yaml.dump(data))
 ' "$INSTALL_CONFIG" > "${ARTIFACT_DIR}/install-config.yaml"
-
-# Remove the ports created in openstack-provision-machinesubnet-commands.sh
-# since the installer will create them again, based on install-config.yaml.
-if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
-	echo "Provider network detected: cleaning up reserved ports"
-	for p in api ingress; do
-		if openstack port show "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}" >/dev/null; then
-			echo "Port exists for ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}: removing it"
-			openstack port delete "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}"
-		fi
-	done
-fi

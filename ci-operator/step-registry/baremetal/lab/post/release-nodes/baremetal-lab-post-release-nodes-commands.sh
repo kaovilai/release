@@ -11,7 +11,12 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'UserKnownHostsFile=/dev/null'
   -o 'ServerAliveInterval=90'
   -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
@@ -41,8 +46,13 @@ sed -i "/,${CLUSTER_NAME},ci-op,/d" /etc/vips_reserved
 
 echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
+# Delete mirror-registry tabs, if any
+if [ -f "/var/builds/${CLUSTER_NAME}/mirror_registry_url" ]; then
+    REGISTRY_PORT=$(head -n 1 "/var/builds/${CLUSTER_NAME}/mirror_registry_url" | awk -F':' '{print $2}')
+    rm -rf /opt/registry-${REGISTRY_PORT}/data/docker/registry/v2/repositories/${CLUSTER_NAME}
+fi
 # TODO normalize and sanitize paths
-rm -rf /{var/builds,opt/html,opt/tftpboot,opt/nfs}/${CLUSTER_NAME}
+rm -rf /{var/builds,opt/html,opt/dnsmasq/tftpboot,opt/nfs}/${CLUSTER_NAME}
 # Delete agent-installer images, if any
 rm -f /opt/html/${CLUSTER_NAME}.*.iso
 

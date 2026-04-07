@@ -1,0 +1,11 @@
+{
+	"path": "openshift/microshift/infra/iso-build/openshift-microshift-infra-iso-build-ref.yaml",
+	"owners": {
+		"approvers": [
+			"microshift-approvers"
+		],
+		"reviewers": [
+			"microshift-reviewers"
+		]
+	}
+}

@@ -3,14 +3,14 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
   openstack-installer:
     name: "4.9"
     namespace: ocp
     tag: openstack-installer
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
   sriov-cni:
     name: "4.9"
     namespace: ocp
@@ -30,30 +30,22 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: sriov-network-webhook
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+    from: base
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.rhel7
+    from: base
+    to: sriov-network-webhook
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: sriov-network-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
   substitutions:
   - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.9
     with: pipeline:sriov-dp-admission-controller
@@ -70,8 +62,9 @@ operator:
   - pullspec: quay.io/openshift/origin-sriov-network-operator:4.9
     with: pipeline:sriov-network-operator
 promotion:
-  name: "4.9"
-  namespace: ocp
+  to:
+  - name: "4.9"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -106,9 +99,9 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
@@ -123,12 +116,13 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: e2e-openstack-nfv
+- always_run: false
+  as: e2e-openstack-nfv
   optional: true
   steps:
     cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov

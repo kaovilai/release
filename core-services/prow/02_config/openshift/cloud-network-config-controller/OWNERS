@@ -6,18 +6,23 @@
 
 approvers:
 - abhat
-- danwinship
-- dcbw
+- jcaamano
 - knobunc
 - kyrtapz
-- trozet
+- martinkennelly
+- pperiyasamy
+- ricky-rav
+- tssurya
 options: {}
 reviewers:
-- abhat
-- andreaskaris
-- danwinship
-- dcbw
+- arghosh93
+- arkadeepsen
+- jcaamano
 - jluhrsen
 - kyrtapz
-- trozet
+- martinkennelly
+- miheer
+- pliurh
+- pperiyasamy
+- ricky-rav
 - tssurya

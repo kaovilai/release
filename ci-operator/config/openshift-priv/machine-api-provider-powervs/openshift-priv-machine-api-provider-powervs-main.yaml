@@ -1,36 +1,24 @@
-base_images:
-  base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-api-provider-powervs
 images:
-- dockerfile_path: Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: powervs-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: powervs-machine-controllers
 promotion:
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - name: 4.22-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -64,6 +52,18 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: machine-api-provider-powervs
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift-priv

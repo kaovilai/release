@@ -1,27 +1,15 @@
-base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: openshift/cloud-network-config-controller
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: cloud-network-config-controller
+  items:
+  - dockerfile_path: Dockerfile
+    to: cloud-network-config-controller
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -43,7 +31,7 @@ test_binary_build_commands: make test
 tests:
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
   steps:
@@ -51,22 +39,26 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-azure-ovn
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: unit
   commands: make test
   container:
     from: src
-- as: e2e-aws-serial
+- as: e2e-aws-sdn-serial
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-serial
-- as: e2e-aws-ovn-serial
+    cluster_profile: openshift-org-aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    workflow: openshift-e2e-aws-sdn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-openstack-sdn-serial-e2e-only
+- always_run: false
+  as: e2e-openstack-sdn-serial-e2e-only
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -74,12 +66,14 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: OpenShiftSDN
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_ARGS: --run \[sig-network\]\[Feature:EgressIP\]
       TEST_SUITE: openshift/conformance/serial
     test:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-ovn-serial-e2e-only
+- always_run: false
+  as: e2e-openstack-ovn-serial-e2e-only
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -92,6 +86,13 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-openstack-ipi
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: cloud-network-config-controller
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

@@ -15,12 +15,15 @@ if [ ! -f "$SHARED_DIR/external_lb" ]; then
     exit 1
 fi
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 echo "$(date -u --rfc-3339=seconds) - Deprovisioning external load balancer..."
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - Checking if external load balancer VM is provisioned..."
 

@@ -1,36 +1,18 @@
-base_images:
-  base:
-    name: "4.6"
-    namespace: ocp
-    tag: base
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 binary_build_commands: make cross
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
-- dockerfile_path: images/openshift-ci/Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: crc
+  items:
+  - dockerfile_path: images/openshift-ci/Dockerfile
+    to: libvirt-installer
 releases:
-  initial:
-    integration:
-      name: "4.6"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.6"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -43,12 +25,25 @@ resources:
 tests:
 - as: e2e-crc
   steps:
-    cluster_profile: gcp
+    cluster_profile: osl-gcp
     workflow: code-ready-crc-e2e
 - as: integration-crc
   steps:
-    cluster_profile: gcp
+    cluster_profile: osl-gcp
     workflow: code-ready-crc-integration
+- as: e2e-microshift-crc
+  steps:
+    cluster_profile: osl-gcp
+    workflow: code-ready-crc-microshift
+- as: security
+  optional: true
+  steps:
+    cluster_profile: osl-gcp
+    env:
+      ORG_NAME: developer-red-hat-openshift-local
+      PROJECT_NAME: crc
+      SNYK_TOKEN_PATH: /var/run/secrets/ci.openshift.io/cluster-profile/snyk-token
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: crc-org

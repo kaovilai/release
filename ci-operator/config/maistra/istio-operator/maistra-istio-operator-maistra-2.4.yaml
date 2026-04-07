@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.15"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,8 +12,8 @@ build_root:
 releases:
   latest:
     release:
-      channel: fast
-      version: "4.10"
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -22,7 +22,7 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: maistra-istio-operator-unit-2-4
+- as: unit
   commands: |
     make compile test \
     GOBIN="/gobin" \
@@ -32,8 +32,7 @@ tests:
     TEST_FLAGS="-v"
   container:
     from: src
-  timeout: 1h0m0s
-- as: maistra-istio-operator-gencheck-2-4
+- as: gencheck
   commands: |
     make gen-check \
     GOBIN="/gobin" \
@@ -42,8 +41,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-  timeout: 30m0s
-- as: maistra-istio-operator-lint-2-4
+- as: lint
   commands: |
     make lint \
     GOBIN="/gobin" \
@@ -52,21 +50,17 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-  timeout: 20m0s
-- as: istio-operator-push-image-2-4
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
+- always_run: false
+  as: push-images
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -85,7 +79,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-push-image-2-4
+    - as: push-images
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
@@ -96,6 +90,7 @@ tests:
           -p=${QUAY_PASS} quay.io; \
           make push \
           IMAGE=quay.io/maistra-dev/istio-ubi8-operator:PR-${PULL_NUMBER}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
@@ -110,10 +105,34 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: update-charts-in-2-6
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export GOFLAGS="-mod=vendor"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -b maistra-2.6 \
+      -f /creds-github/token \
+      '-c make clean update-charts-2.4 update-charts-2.5 \
+      '-t [maistra-2.6] Automator: Update charts from previous versions' \
+      -m update_charts_from_previous_versions_2.4_2.5
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
 zz_generated_metadata:
   branch: maistra-2.4
   org: maistra

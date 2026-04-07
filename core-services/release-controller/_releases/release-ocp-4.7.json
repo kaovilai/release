@@ -1,13 +1,15 @@
 {
   "name":"4.7.0-0.nightly",
+  "endOfLife": true,
   "to": "release",
-  "message": "This release contains OSBS official image builds of all code in release-4.7 (master) branches, and is updated after those builds are synced to quay.io.",
+  "message": "This release contains official image builds of all code in release-4.7 (main) branches, and is updated after those builds are synced to quay.io.",
   "mirrorPrefix": "4.7-art-latest",
   "expires":"126h",
-  "maxUnreadyReleases": 2,
-  "minCreationIntervalSeconds": 2400,
+  "maxUnreadyReleases": 1,
+  "minCreationIntervalSeconds": 21600,
   "referenceMode": "source",
   "pullSecretName": "source",
+  "overrideCLIImage": "image-registry.openshift-image-registry.svc:5000/ocp/4.11-art-latest:cli",
   "check":{
     "OCP and Origin images should match": {
       "consistentImages":{"parent":"4.7.0-0.ci"}
@@ -15,15 +17,6 @@
   },
   "publish":{
     "tag":{"tagRef":{"name":"4.7"}},
-    "bugs":{
-      "verifyBugs":{
-        "previousReleaseTag":{
-          "namespace":"ocp",
-          "name":"release",
-          "tag":"4.7.0-rc.0"
-        }
-      }
-    },
     "issues": {
       "verifyIssues": {
         "previousReleaseTag": {
@@ -37,111 +30,99 @@
   "verify":{
     "aws":{
       "maxRetries": 3,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-aws"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-aws"}
     },
     "aws-serial":{
       "maxRetries": 3,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-aws-serial"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-aws-serial"}
     },
     "azure":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-azure"}
-    },
-    "azure-serial":{
-      "optional":true,
-      "prowJob":{"name":"release-openshift-ocp-installer-e2e-azure-serial-4.7"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-azure"}
     },
     "gcp":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-gcp"}
-    },
-    "gcp-serial":{
-      "optional":true,
-      "prowJob":{"name":"release-openshift-ocp-installer-e2e-gcp-serial-4.7"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-gcp"}
     },
     "gcp-rt":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-gcp-rt"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-gcp-rt"}
     },
     "metal-ipi": {
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-metal-ipi"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-metal-ipi"}
     },
     "metal-ipi-upgrade":{
       "upgrade":true,
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-metal-ipi-upgrade"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-metal-ipi-upgrade"}
     },
     "metal-ipi-ovn-ipv6": {
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-metal-ipi-ovn-ipv6"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-metal-ipi-ovn-ipv6"}
     },
     "metal-ipi-ovn-dualstack": {
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-metal-ipi-ovn-dualstack"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-metal-ipi-ovn-dualstack"}
     },
     "metal-ipi-virtualmedia": {
       "optional": true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-metal-ipi-virtualmedia"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-metal-ipi-virtualmedia"}
     },
     "vsphere-upi":{
       "optional": true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-vsphere-upi"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-vsphere-upi"}
     },
     "vsphere":{
       "optional": true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-vsphere"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-vsphere"}
     },
     "vsphere-upi-serial":{
       "optional": true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-vsphere-upi-serial"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-vsphere-upi-serial"}
     },
     "vsphere-serial":{
       "optional": true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-vsphere-serial"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-vsphere-serial"}
     },
     "aws-console":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-console-aws"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-console-aws"}
     },
     "upgrade":{
       "upgrade":true,
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-aws-upgrade"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-aws-upgrade"}
     },
     "upgrade-minor":{
       "upgrade":true,
       "upgradeFrom": "PreviousMinor",
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-upgrade-from-stable-4.6-e2e-aws-upgrade"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-upgrade-from-stable-4.6-e2e-aws-upgrade"}
     },
     "aws-fips":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-aws-fips"}
-    },
-    "aws-upi":{
-      "optional":true,
-      "prowJob":{"name":"release-openshift-ocp-installer-e2e-aws-upi-4.7"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-aws-fips"}
     },
     "aws-ovn":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.7-e2e-aws-ovn"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-ci-4.7-e2e-aws-ovn"}
     },
     "gcp-ovn":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.7-e2e-gcp-ovn"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-ci-4.7-e2e-gcp-ovn"}
     },
     "azure-ovn":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.7-e2e-azure-ovn"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-ci-4.7-e2e-azure-ovn"}
     },
     "ovirt":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-ovirt"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-ovirt"}
     },
     "proxy":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-nightly-4.7-e2e-aws-proxy"}
+      "prowJob":{"name":"periodic-ci-openshift-release-main-nightly-4.7-e2e-aws-proxy"}
     }
   }
 }

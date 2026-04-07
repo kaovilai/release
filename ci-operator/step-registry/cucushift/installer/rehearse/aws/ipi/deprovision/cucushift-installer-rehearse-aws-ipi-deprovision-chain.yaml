@@ -5,6 +5,7 @@ chain:
   - chain: gather-core-dump
   - ref: gather-aws-console
   - chain: ipi-deprovision
-  - ref: configure-registry-storage-destroy-s3-cloudfront 
+  - ref: aws-deprovision-users-and-policies
+  - ref: aws-deprovision-verification
   documentation: |-
     Destroy cluster

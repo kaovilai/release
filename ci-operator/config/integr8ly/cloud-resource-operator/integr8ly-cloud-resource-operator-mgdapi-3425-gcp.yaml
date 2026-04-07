@@ -9,17 +9,19 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
-  to: cloud-resource-operator
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
+    to: cloud-resource-operator
 promotion:
-  name: mgdapi-3425-gcp
-  namespace: integr8ly
+  to:
+  - name: mgdapi-3425-gcp
+    namespace: integr8ly
 releases:
   initial:
     integration:

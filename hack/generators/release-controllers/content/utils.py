@@ -7,20 +7,33 @@ def get_kubeconfig_volume_mounts():
             'readOnly': True
         }]
 
+def get_oc_volume_mounts():
+    return [
+        {
+            'mountPath': '/tmp/home',
+            'name': 'home',
+        },{
+            'mountPath': '/tmp/git',
+            'name': 'oc-cache',
+        },{
+            'mountPath': '/tmp/home/.git-credentials',
+            'name': 'git-credentials',
+            'subPath': '.git-credentials'
+        },{
+            'mountPath': '/tmp/pull-secret',
+            'name':'pull-secret'
+        }
+    ]
+
 
 def get_rcapi_volume_mounts():
     return [
-        {
-            'mountPath': '/etc/kubeconfigs',
-            'name': 'release-controller-kubeconfigs',
-            'readOnly': True
-        },
         {
             'mountPath': '/etc/jira',
             'name': 'jira',
             'readOnly': True
         }
-    ]
+    ] + get_kubeconfig_volume_mounts() + get_oc_volume_mounts()
 
 
 def get_rc_volume_mounts():
@@ -31,18 +44,12 @@ def get_rc_volume_mounts():
             'readOnly': True
         },
         {
-            'mountPath': '/etc/job-config',
-            'name': 'job-config',
-            'readOnly': True
+            'mountPath': '/var/repo',
+            'name': 'release'
         },
         {
             'mountPath': '/etc/github',
             'name': 'oauth',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/bugzilla',
-            'name': 'bugzilla',
             'readOnly': True
         },
         {
@@ -54,7 +61,7 @@ def get_rc_volume_mounts():
             'mountPath': '/etc/plugins',
             'name': 'plugins',
             'readOnly': True
-        }] + get_kubeconfig_volume_mounts()
+        }] + get_kubeconfig_volume_mounts() + get_oc_volume_mounts()
 
 
 def get_kubeconfig_volumes(context, secret_name=None):
@@ -71,20 +78,39 @@ def get_kubeconfig_volumes(context, secret_name=None):
             }
         }]
 
+def get_oc_volumes():
+    return [
+        {
+            'name': 'home',
+            'emptyDir': {}
+        },{
+            'name': 'oc-cache',
+            'emptyDir': {}
+        },{
+            'name': 'git-credentials',
+            'secret': {
+                'defaultMode': 420,
+                'secretName': 'release-controller-oc-git-credentials',
+                'items': [{
+                    'key': '.git-credentials',
+                    'path': '.git-credentials'
+                }]
+            }
+        },{
+            'name': 'pull-secret',
+            'secret': {
+                'defaultMode': 420,
+                'secretName': 'release-controller-oc-pull-secret'
+            }
+        }
+    ]
+
 
 def get_rcapi_volumes(context, secret_name=None):
     if secret_name is None:
         secret_name = context.secret_name_tls
 
     return [
-        *_get_dynamic_deployment_volumes(context, secret_name),
-        {
-            'name': 'release-controller-kubeconfigs',
-            'secret': {
-                'defaultMode': 420,
-                'secretName': 'release-controller-kubeconfigs'
-            }
-        },
         {
             'name': 'jira',
             'secret': {
@@ -92,7 +118,7 @@ def get_rcapi_volumes(context, secret_name=None):
                 'secretName': 'jira-credentials-openshift-jira-robot'
             }
         }
-    ]
+    ] + get_kubeconfig_volumes(context, secret_name) + get_oc_volumes()
 
 def get_rc_volumes(context):
     return [
@@ -104,65 +130,14 @@ def get_rc_volumes(context):
             'name': 'config'
         },
         {
-            'name': 'job-config',
-            'projected': {
-                'sources': [
-                    {
-                        'configMap': {
-                            'name': 'job-config-misc'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-master-periodics'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-master-postsubmits'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-master-presubmits'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-1.x'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-2.x'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-3.x'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-4.0'
-                        }
-                    },
-                    *_get_dynamic_projected_deployment_volumes(context),
-                ]
-            }
+            'name': 'release',
+            'emptyDir': {}
         },
         {
             'name': 'oauth',
             'secret': {
                 'defaultMode': 420,
                 'secretName': 'github-credentials-openshift-merge-robot'
-            }
-        },
-        {
-            'name': 'bugzilla',
-            'secret': {
-                'defaultMode': 420,
-                'secretName': 'bugzilla-credentials-openshift-bugzilla-robot'
             }
         },
         {
@@ -178,7 +153,7 @@ def get_rc_volumes(context):
                 'name': 'plugins'
             },
             'name': 'plugins'
-        }] + get_kubeconfig_volumes(context, secret_name=context.secret_name_tls)
+        }] + get_kubeconfig_volumes(context, secret_name=context.secret_name_tls) + get_oc_volumes()
 
 
 def _get_dynamic_deployment_volumes(context, secret_name):

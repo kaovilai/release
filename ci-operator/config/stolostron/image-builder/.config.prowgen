@@ -1,2 +1,1 @@
-additional_architectures:
-- arm64
+multi_arch: true

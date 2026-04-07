@@ -1,9 +1,12 @@
 approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
-  ignore_review_state: true
   repos:
   - operator-framework/api
-  require_self_approval: false
+  require_self_approval: true
+lgtm:
+- repos:
+  - operator-framework/api
+  review_acts_as_lgtm: true
 plugins:
   operator-framework/api:
     plugins:

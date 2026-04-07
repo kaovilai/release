@@ -4,6 +4,27 @@ set -e
 set -u
 set -o pipefail
 
+# retry_until_success <retries> <sleep_time> <function_name> [args...]
+# - retries       : max number of attempts
+# - sleep_time    : seconds between attempts
+# - func          : the function to be called or a sub shell call
+function retry_until_success() {
+    local retries="$1"
+    local sleep_time="$2"
+    shift 2   # drop retries and sleep_time
+    for i in $(seq 1 "$retries"); do
+        echo "Attempt $i/$retries: running $*"
+        if "$@"; then
+            echo "Success on attempt $i"
+            return 0
+        fi
+        echo "Failed attempt $i, retrying in $sleep_time seconds..."
+        sleep "$sleep_time"
+    done
+    echo "$* did not succeed after $retries attempts"
+    return 1
+}
+
 function check_node() {
     local node_number ready_number
     node_number=$(oc get node --no-headers | grep -cv STATUS)
@@ -41,11 +62,35 @@ EOT
     oc wait clusterversion/version --for='condition=Available=True' --timeout=15m
 
     echo "Step #2: Make sure every machine is in 'Ready' status"
-    check_node
+    retry_until_success 60 10 check_node
 
     echo "Step #3: Check all pods are in status running or complete"
     check_pod
 }
+
+# Function to check if an update of the pull-secret is required for HostedCluster NodePool
+function check_update_pullsecret() {
+    UPDATED_COUNT=0
+    workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{","}{end}')
+    IFS="," read -r -a workers_arr <<< "$workers"
+    COUNT=${#workers_arr[*]}
+
+    for worker in "${workers_arr[@]}"; do
+        count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c quay.io/openshifttest || true)
+        if [ $count -gt 0 ] ; then
+            UPDATED_COUNT=$((UPDATED_COUNT + 1))
+        fi
+    done
+
+    if [ "$UPDATED_COUNT" == "$COUNT" ] ; then
+        echo "don't need to update HostedCluster NodePool's pull-secret"
+        exit 0
+    fi
+}
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
   echo "SKIP ....."
@@ -55,6 +100,9 @@ fi
 if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
   exit 1
 fi
+
+export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+check_update_pullsecret
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 CLUSTER_NAME=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o=jsonpath='{.items[0].metadata.name}')
@@ -67,10 +115,18 @@ optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | j
 optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
 qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
+openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+
+stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
+stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
+stage_registry_auth=`echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0`
+
 reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
 reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
 brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/global-pull-secret.json" > /tmp/global-pull-secret.json.tmp
+jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/global-pull-secret.json" > /tmp/global-pull-secret.json.tmp
 
 mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
 oc create secret -n "$HYPERSHIFT_NAMESPACE" generic "$CLUSTER_NAME"-pull-secret-new --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
@@ -81,15 +137,15 @@ oc patch hostedclusters -n "$HYPERSHIFT_NAMESPACE" "$CLUSTER_NAME" --type=merge 
 
 echo "check day-2 pull-secret update"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-RETRIES=30
+RETRIES=45
 for i in $(seq ${RETRIES}); do
   UPDATED_COUNT=0
   workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{","}{end}')
   IFS="," read -r -a workers_arr <<< "$workers"
   COUNT=${#workers_arr[*]}
-  for worker in ${workers_arr[*]}
+  for worker in "${workers_arr[@]}"
   do
-  count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c jiazha@redhat.com || true)
+  count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c quay.io/openshifttest || true)
   if [ $count -gt 0 ] ; then
       UPDATED_COUNT=`expr $UPDATED_COUNT + 1`
   fi

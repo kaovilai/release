@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.4$
     - ^release-4\.4-
-    cluster: build02
+    cluster: build06
     context: ci/prow/create-cluster
     decorate: true
     decoration_config:
@@ -26,9 +26,17 @@ presubmits:
         - --target=create-cluster
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -38,6 +46,9 @@ presubmits:
           readOnly: true
         - mountPath: /secrets/ibm-gate-test-secrets
           name: ibm-gate-test-secrets
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -50,6 +61,9 @@ presubmits:
       - name: ibm-gate-test-secrets
         secret:
           secretName: ibm-gate-test-secrets
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -58,11 +72,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )create-cluster,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.4$
     - ^release-4\.4-
-    cluster: build02
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -71,7 +85,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-toolkit-release-4.4-images
-    optional: true
     rerun_command: /test images
     spec:
       containers:
@@ -82,7 +95,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -92,6 +105,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -100,6 +116,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -112,7 +131,7 @@ presubmits:
     branches:
     - ^release-4\.4$
     - ^release-4\.4-
-    cluster: build02
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -131,15 +150,26 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -149,6 +179,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

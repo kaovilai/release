@@ -6,18 +6,19 @@
 
 approvers:
 - david-martin
+- jasonmadigan
 - maleck13
 - mikenairn
 - philbrookes
-- sergioifg94
 options: {}
 reviewers:
 - david-martin
 - jasonmadigan
-- makslion
+- laurafitzgerald
 - maleck13
 - mikenairn
 - philbrookes
 - pmccarthy
 - r-lawton
-- sergioifg94
+- roivaz
+- ygnas

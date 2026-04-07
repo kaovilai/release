@@ -3,13 +3,13 @@
 ## Unrelated histories
 
 A force-push in one of the repositories which has a counterpart in
-`openshfit-priv` will cause the job to fail to synchronize the repositories,
+`openshift-priv` will cause the job to fail to synchronize the repositories,
 e.g.:
 
 ```
 time="2022-11-01T08:23:40Z" level=warning msg="error occurred while fetching remote and merge" branch=release-4.13 destination=openshift-priv/cluster-api-provider-ibmcloud@release-4.13 error="[failed to merge openshift-cluster-api-provider-ibmcloud/release-4.13: failed with 128 exit-code: fatal: refusing to merge unrelated histories\n, failed to perform merge --abort: failed with 128 exit-code: fatal: There is no merge to abort (MERGE_HEAD missing).\n]" local-repo=/tmp/1970879496/openshift/cluster-api-provider-ibmcloud org=openshift repo=cluster-api-provider-ibmcloud source=openshift/cluster-api-provider-ibmcloud@release-4.13 source-file=openshift-cluster-api-provider-ibmcloud-release-4.13.yaml variant=
 ```
-https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/periodic-openshift-release-private-org-sync/1587355868737835008
+https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-openshift-release-private-org-sync/1587355868737835008
 
 Because merge conflicts are [ignored][private_org_sync_readme] by
 `private-org-sync`, this will not cause the synchronization job to fail;
@@ -42,4 +42,4 @@ To https://openshift-merge-robot@github.com/openshift-priv/cluster-api-provider-
  + 3bde969f...5e3a2bae public/release-4.13 -> release-4.13 (forced update)
 ```
 
-[private_org_sync_readme]: https://github.com/openshift/ci-tools/blob/master/cmd/private-org-sync/README.md
+[private_org_sync_readme]: https://github.com/openshift/ci-tools/blob/main/cmd/private-org-sync/README.md

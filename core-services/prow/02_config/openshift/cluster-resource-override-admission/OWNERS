@@ -5,13 +5,11 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- deads2k
+- jkyros
 - joelsmith
-- rphillips
-- sanchezl
-- sjenning
-- tkashem
+- maxcao13
 options: {}
 reviewers:
-- sanchezl
-- tkashem
+- jkyros
+- joelsmith
+- maxcao13

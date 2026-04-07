@@ -11,16 +11,14 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ironic-image
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-9-base-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.12
-  to: ironic
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: ironic
 promotion:
-  name: 4.12-priv
-  namespace: ocp-private
+  to:
+  - name: 4.12-priv
+    namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -45,15 +43,17 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-bm
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal

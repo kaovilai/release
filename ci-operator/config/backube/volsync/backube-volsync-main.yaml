@@ -1,12 +1,16 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.16"
     namespace: ocp
     tag: cli
-  operator-index:
-    name: redhat-operator-index
-    namespace: ci
-    tag: v4.10
+  ocp_builder_volsync:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
+  operator-sdk:
+    name: "4.16"
+    namespace: origin
+    tag: operator-sdk
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -15,9 +19,9 @@ binary_build_commands: make all
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9
+      FROM registry.access.redhat.com/ubi9/python-311
       USER root
-      ENV GOVERSION=1.19.5
+      ENV GOVERSION=1.25.3
       RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
           yum clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
@@ -36,41 +40,46 @@ build_root:
       ENV XDG_DATA_HOME=/.local
       WORKDIR $GOPATH/src/github.com/backube/volsync
 images:
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
-- context_dir: .
-  from: ubi_minimal
-  to: volsync
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - context_dir: .
+    from: ubi_minimal
+    inputs:
+      ocp_builder_volsync:
+        as:
+        - golang:1.25
+    to: volsync
 operator:
   bundles:
   - as: volsync-bundle
-    base_index: operator-index
     context_dir: .
     dockerfile_path: bundle.Dockerfile
-    update_graph: replaces
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/backube/volsync:latest
     with: pipeline:volsync
 promotion:
-  additional_images:
-    volsync: volsync
-  namespace: volsync
-  tag: latest
+  to:
+  - additional_images:
+      volsync: volsync
+    namespace: volsync
+    tag: latest
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -80,6 +89,7 @@ resources:
       memory: 1Gi
 tests:
 - as: unit
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: unit
@@ -92,21 +102,72 @@ tests:
           cpu: 500m
           memory: 1Gi
 - as: e2e-openshift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-volsync-bundle
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "false"
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-operators
-      OO_PACKAGE: volsync
-      OO_TARGET_NAMESPACES: '!all'
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws
+      SKIP_COMPONENT_INSTALL: "true"
     test:
+    - as: e2e-install-operator
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        # Make sure we can connect to the cluster
+        count=0
+        max_retries=10
+        sleeptime=30
+        while true; do
+          count=$(( count + 1 ))
+          NODE_COUNT=0
+          NODES=$(oc get nodes --no-headers=true) && echo "Connected to the cluster" && echo -e "$NODES" && NODE_COUNT=$(echo -e "$NODES" | wc -l)
+
+          echo "$NODE_COUNT Nodes ..."
+          if [[ $NODE_COUNT -gt 0 ]]; then
+            NODE_READY_COUNT=$(echo -e "$NODES" | grep Ready | grep -v NotReady | wc -l)
+            echo "$NODE_READY_COUNT Ready Nodes ..."
+
+            if [[ $NODE_READY_COUNT -eq $NODE_COUNT ]]; then
+              echo "All Nodes are ready"
+              break
+            fi
+          fi
+
+          echo "Cannot connect to cluster or not all nodes are ready"
+
+          if [[ $count -gt $max_retries ]]; then
+            echo "Timed out waiting for the cluster to be ready."
+            exit 1
+          fi
+
+          echo "WARN cluster is not ready, will retry in $sleeptime seconds ..."
+          sleep $sleeptime
+        done
+
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 15m0s
+        oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: volsync-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        oc -n openshift-operators get deploy
+        oc -n openshift-operators get pod
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -120,34 +181,85 @@ tests:
         export PATH="${PATH}:/alabama/.local/bin"
         # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
         export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
-        make test-e2e-install
+        make test-e2e-install PIP_INSTALL_ARGS=
 
         # Run tests
         make cli
-        export BATCHES=2
+        export BATCHES=4
         make test-e2e
       from: src-oc
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: ocm-e2e-clusterpool
 - as: e2e-openshift-fips
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-volsync-bundle
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "true"
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-operators
-      OO_PACKAGE: volsync
-      OO_TARGET_NAMESPACES: '!all'
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-fips-aws
+      SKIP_COMPONENT_INSTALL: "true"
     test:
+    - as: e2e-install-operator
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        # Make sure we can connect to the cluster
+        count=0
+        max_retries=10
+        sleeptime=30
+        while true; do
+          count=$(( count + 1 ))
+          NODE_COUNT=0
+          NODES=$(oc get nodes --no-headers=true) && echo "Connected to the cluster" && echo -e "$NODES" && NODE_COUNT=$(echo -e "$NODES" | wc -l)
+
+          echo "$NODE_COUNT Nodes ..."
+          if [[ $NODE_COUNT -gt 0 ]]; then
+            NODE_READY_COUNT=$(echo -e "$NODES" | grep Ready | grep -v NotReady | wc -l)
+            echo "$NODE_READY_COUNT Ready Nodes ..."
+
+            if [[ $NODE_READY_COUNT -eq $NODE_COUNT ]]; then
+              echo "All Nodes are ready"
+              break
+            fi
+          fi
+
+          echo "Cannot connect to cluster or not all nodes are ready"
+
+          if [[ $count -gt $max_retries ]]; then
+            echo "Timed out waiting for the cluster to be ready."
+            exit 1
+          fi
+
+          echo "WARN cluster is not ready, will retry in $sleeptime seconds ..."
+          sleep $sleeptime
+        done
+
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 15m0s
+        oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: volsync-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        oc -n openshift-operators get deploy
+        oc -n openshift-operators get pod
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -161,28 +273,67 @@ tests:
         export PATH="${PATH}:/alabama/.local/bin"
         # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
         export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
-        make test-e2e-install
+        make test-e2e-install PIP_INSTALL_ARGS=
 
         # Run tests
         make cli
-        export BATCHES=2
+        export BATCHES=4
         make test-e2e
       from: src-oc
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: ocm-e2e-clusterpool
 - as: e2e-openshift-helm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "false"
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        # Make sure we can connect to the cluster
+        count=0
+        max_retries=10
+        sleeptime=30
+        while true; do
+          count=$(( count + 1 ))
+          NODE_COUNT=0
+          NODES=$(oc get nodes --no-headers=true) && echo "Connected to the cluster" && echo -e "$NODES" && NODE_COUNT=$(echo -e "$NODES" | wc -l)
+
+          echo "$NODE_COUNT Nodes ..."
+          if [[ $NODE_COUNT -gt 0 ]]; then
+            NODE_READY_COUNT=$(echo -e "$NODES" | grep Ready | grep -v NotReady | wc -l)
+            echo "$NODE_READY_COUNT Ready Nodes ..."
+
+            if [[ $NODE_READY_COUNT -eq $NODE_COUNT ]]; then
+              echo "All Nodes are ready"
+              break
+            fi
+          fi
+
+          echo "Cannot connect to cluster or not all nodes are ready"
+
+          if [[ $count -gt $max_retries ]]; then
+            echo "Timed out waiting for the cluster to be ready."
+            exit 1
+          fi
+
+          echo "WARN cluster is not ready, will retry in $sleeptime seconds ..."
+          sleep $sleeptime
+        done
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -202,18 +353,21 @@ tests:
           --set rsync-tls.image=${VOLSYNC_OPERATOR} \
           --set syncthing.image=${VOLSYNC_OPERATOR} \
           --set metrics.disableAuth=true \
-          --wait --timeout=5m \
+          --wait --timeout=15m \
           volsync ./helm/volsync
+
+        oc -n volsync-system get deploy
+        oc -n volsync-system get pod
 
         # Add .local/bin to path so we can execute Python packages we install below
         export PATH="${PATH}:/alabama/.local/bin"
         # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
         export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
-        make test-e2e-install
+        make test-e2e-install PIP_INSTALL_ARGS=
 
         # Run tests
         make cli
-        export BATCHES=2
+        export BATCHES=4
         make test-e2e
       dependencies:
       - env: VOLSYNC_OPERATOR
@@ -223,7 +377,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws
+    workflow: ocm-e2e-clusterpool
 zz_generated_metadata:
   branch: main
   org: backube

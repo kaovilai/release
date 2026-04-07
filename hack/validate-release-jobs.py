@@ -12,7 +12,17 @@ logger = logging.getLogger('validate-release-jobs')
 logger.setLevel(logging.INFO)
 
 release_definition_path = 'core-services/release-controller/_releases'
-job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch', 'ci-operator/jobs/openshift/hypershift', 'ci-operator/jobs/openshift/microshift', 'ci-operator/jobs/openshift/cluster-control-plane-machine-set-operator']
+job_definitions_paths = [
+    'ci-operator/jobs/openshift/release',
+    'ci-operator/jobs/openshift/multiarch',
+    'ci-operator/jobs/openshift/hypershift',
+    'ci-operator/jobs/openshift/microshift',
+    'ci-operator/jobs/openshift/cluster-control-plane-machine-set-operator',
+    'ci-operator/jobs/openshift/osde2e',
+    'ci-operator/jobs/openshift-eng/ocp-qe-perfscale-ci',
+    'ci-operator/jobs/ran-telco5g/kpi-results',
+    'ci-operator/jobs/openshift-kni/eco-ci-cd'
+]
 
 
 def raise_on_duplicates(ordered_pairs):
@@ -97,7 +107,7 @@ def main(git_repo_path):
         core-services/release-controller/_releases, and then run a "make release-controllers" from the root of the repo.
     - If your PR has changes that have added any of the aforementioned jobs, then you must also ensure that these jobs have been defined in their respective location under:
         ci-operator/jobs
-    - If you have no idea why you've received this error, then it's most likely do to another commit that introduced the problem.  Please reach out to #forum-crt in Slack.'''
+    - If you have no idea why you've received this error, then it's most likely do to another commit that introduced the problem.  Please reach out to #forum-ocp-crt in Slack.'''
 
         logger.error(message)
 

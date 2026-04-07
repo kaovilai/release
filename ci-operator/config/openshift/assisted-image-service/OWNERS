@@ -7,37 +7,41 @@
 filters:
   .*:
     approvers:
+    - adriengentil
     - avishayt
+    - bluesort
     - carbonin
     - danielerez
+    - danmanor
     - eliorerz
     - eranco74
-    - filanov
-    - flaper87
     - gamli75
-    - mkowalski
-    - nmagnezi
+    - giladravid16
+    - omer-vishlitzky
     - omertuc
     - ori-amizur
-    - osherdp
+    - pastequo
+    - rccrdpccl
     - romfreiman
-    - slaviered
     - tsorya
+    - yoavsc0302
     reviewers:
+    - adriengentil
     - avishayt
+    - bluesort
     - carbonin
     - danielerez
+    - danmanor
     - eliorerz
     - eranco74
-    - filanov
-    - flaper87
     - gamli75
-    - mkowalski
-    - nmagnezi
+    - giladravid16
+    - omer-vishlitzky
     - omertuc
     - ori-amizur
-    - osherdp
+    - pastequo
+    - rccrdpccl
     - romfreiman
-    - slaviered
     - tsorya
+    - yoavsc0302
 options: {}

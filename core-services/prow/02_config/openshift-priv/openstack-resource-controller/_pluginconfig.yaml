@@ -1,0 +1,16 @@
+approve:
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - openshift-priv/openstack-resource-controller
+  require_self_approval: true
+plugins:
+  openshift-priv/openstack-resource-controller:
+    plugins:
+    - approve
+    - golint
+    - goose
+    - jira
+    - owners-label
+    - pony
+    - sigmention

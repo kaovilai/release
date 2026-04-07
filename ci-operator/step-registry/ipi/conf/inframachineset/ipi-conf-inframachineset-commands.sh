@@ -4,11 +4,25 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, can not continue."
 	exit 0
 fi
+
+MAJOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $1}')
+MINOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $2}')
 
 # Download jq
 mkdir /tmp/bin
@@ -132,8 +146,13 @@ if [[ "${REGISTRY_PODS_MOVED}" == "false" ]]; then
   exit 1
 fi
 
+
+# The CMO config validation is more strict from 4.18, it will throw error if an unsupported
+# filed is given, the Grafana component in monitoring stack is removed since 4.11, and also
+# Metrics Server GA and replaced Prometheus Adapter since 4.16, so adding version judgment to
+# cover both low and high versions tests.
 echo "Moving monitoring pods to infra nodes"
-oc apply -f - <<EOF
+yaml=$(cat <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -150,12 +169,6 @@ data:
     prometheusOperator:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
-    grafana:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-    k8sPrometheusAdapter:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
     kubeStateMetrics:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
@@ -169,6 +182,35 @@ data:
       nodeSelector:
         node-role.kubernetes.io/infra: ""
 EOF
+)
+if [[ $MAJOR -eq 4 && $MINOR -lt 11 ]]; then
+    yaml+=$(cat <<EOF
+    
+    grafana:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+EOF
+)
+fi
+if [[ $MAJOR -eq 4 && $MINOR -lt 16 ]]; then
+    yaml+=$(cat <<EOF
+    
+    k8sPrometheusAdapter:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+EOF
+)
+fi
+if [[ $MAJOR -eq 4 && $MINOR -ge 16 ]]; then
+    yaml+=$(cat <<EOF
+    
+    metricsServer:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+EOF
+)
+fi
+echo "$yaml" | oc apply -oyaml -f -
 
 MONITORING_PODS_MOVED="false"
 for i in $(seq 0 60); do
@@ -189,4 +231,4 @@ fi
 
 echo "Waiting for all pods to settle"
 sleep 5
-while [[ $(oc get pods --no-headers -A | grep -Pv "(Completed|Running)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done
+while [[ $(echo -e "openshift-ingress\nopenshift-image-registry\nopenshift-monitoring" | xargs -I {} oc get pods -n {} --no-headers | grep -Pv "(Completed|Running)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done

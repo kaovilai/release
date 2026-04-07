@@ -1,1 +1,13 @@
-../../OWNERS
+approvers:
+- csrwng
+- enxebre
+- sjenning
+- davidvossel
+- LiangquanLi930
+- bryan-cox
+options: {}
+reviewers:
+- csrwng
+- enxebre
+- sjenning
+- bryan-cox

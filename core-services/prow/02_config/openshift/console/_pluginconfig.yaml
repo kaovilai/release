@@ -3,36 +3,38 @@ label:
     openshift/console:
     - allowed_users:
       - jhadvig
-      - kdoberst
+      - vojtechszocs
       - rhamilto
       - spadgett
       - TheRealJon
-      - afreen23
-      - bipuladh
-      - christianvogt
-      - invincibleJai
-      - jerolimov
-      - rohitkrai03
-      - yaacov
-      - kyoto
+      - logonoff
       - vikram-raj
+      - sg00dwin
+      - cajieh
+      - Leo6Leo
+      - krishagarwal278
       label: backport-risk-assessed
     - allowed_users:
       - yapei
       - yanpzhan
-      - juzhao
-      - lihongyan1
-      - gouyang
-      - nehaberry
-      - ebenahar
+      - XiyunZhao
       - sanketpathak
-      - jrichter1
-      - hemantsaini-7
-      - sparshkesari
-      - ikerreyes
       assign_on:
       - label: backport-risk-assessed
       label: cherry-pick-approved
+    - allowed_users:
+      - jhadvig
+      - vojtechszocs
+      - spadgett
+      label: plugin-api-changed
+    - allowed_users:
+      - jhadvig
+      - vojtechszocs
+      - logonoff
+      - spadgett
+      assign_on:
+      - label: plugin-api-changed
+      label: plugin-api-approved
 plugins:
   openshift/console:
     plugins:

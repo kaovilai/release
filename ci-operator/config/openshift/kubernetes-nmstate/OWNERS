@@ -6,15 +6,13 @@
 
 approvers:
 - cybertron
-- dougsland
 - mkowalski
 - phoracek
 - qinqon
 options: {}
 reviewers:
 - cybertron
-- dougsland
+- emy
 - mkowalski
 - phoracek
 - qinqon
-- ramlavi

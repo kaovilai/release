@@ -1,12 +1,8 @@
 base_images:
-  base:
-    name: "4.14"
+  base-9:
+    name: "4.21"
     namespace: ocp
-    tag: base
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+    tag: base-rhel9
   os-min8:
     name: ubi-minimal
     namespace: ocp
@@ -16,94 +12,139 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- context_dir: .
-  dockerfile_path: cnf-tests/Dockerfile.openshift
-  from: base
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: cnf-tests
-- context_dir: tools/s2i-dpdk/
-  dockerfile_path: Dockerfile
-  from: base
-  to: dpdk
-- context_dir: .
-  dockerfile_path: ztp/resource-generator/Containerfile
-  from: os-min8
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: ztp-site-generator
+  items:
+  - context_dir: .
+    dockerfile_path: cnf-tests/Dockerfile.openshift
+    from: base-9
+    to: cnf-tests
+  - context_dir: tools/s2i-dpdk/
+    dockerfile_path: Dockerfile
+    from: base-9
+    to: dpdk
+  - context_dir: .
+    dockerfile_path: ztp/resource-generator/Containerfile
+    from: os-min8
+    to: ztp-site-generator
 promotion:
-  name: "4.14"
-  namespace: ocp-kni
+  to:
+  - name: "4.21"
+    namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.21"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.14"
+      version: "4.21"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ci
+- always_run: false
+  as: ci
   commands: make ci-job
   container:
     from: src
-- as: e2e-gcp-ovn
-  skip_if_only_changed: ^ztp
+  skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
+- as: ztp-ci
+  commands: make ztp-ci-job
+  container:
+    from: src
+  run_if_changed: ^ztp
+- always_run: false
+  as: e2e-aws-ci-tests
+  skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws-telco
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch master
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ci-tests-master
+        ci-job-type e2e-aws-ci-tests
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
     test:
-    - as: e2e-gcp-ovn
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+    - as: e2e-aws-ci-tests
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" TARGET_RELEASE=release-4.21
+        make functests-on-ci
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-gcp-ovn
-- as: e2e-aws-ran-profile
+      timeout: 4h0m0s
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ran-profile
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch master
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ran-profile-master
+        ci-job-type e2e-aws-ran-profile
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
     test:
     - as: e2e-aws-ran-profile
       commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
-        container-mount-namespace gatekeeper n3000 fec metallb sro multinetworkpolicy"
-        make validate-on-ci
+        container-mount-namespace gatekeeper n3000 fec metallb sro multinetworkpolicy
+        knmstate" make validate-on-ci
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-ovn
-- as: e2e-gcp-ovn-periodic
-  cron: 0 */8 * * *
+- always_run: false
+  as: security
+  optional: true
+  skip_if_only_changed: \.tekton/.*|^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
   steps:
-    cluster_profile: gcp
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e-gcp-ovn-periodic
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp-ovn
+      PROJECT_NAME: cnf-features-deploy
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-telco5g-cnftests
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: cnftests
+      T5CI_VERSION: "4.21"
+    workflow: telco5g-cnf
+- always_run: false
+  as: e2e-telco5g-hcp-cnftests
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: hcp-cnftests
+      T5CI_VERSION: "4.21"
+    workflow: telco5g-hcp-cnf
 zz_generated_metadata:
   branch: master
   org: openshift-kni

@@ -32,7 +32,7 @@ function eval_instance_capacity() {
   # During our initial adoption of m6a, AWS has report insufficient capacity at peak hours. For cost effectiveness
   # and to ensure AWS eventual adds m6a capacity due to these errors, we want to continue to use them. However,
   # if left unchecked, these peak hour errors can derail a statistically significant number of jobs.
-  # To mitigate the capacity issues, search.ci.openshift.org can tell us if previous jobs have failed to provision
+  # To mitigate the capacity issues, search.dptools.openshift.org can tell us if previous jobs have failed to provision
   # the desired instance type - in this region - in the last x minutes.
   # If we find such an error, use the fallback instance type.
 
@@ -46,7 +46,7 @@ function eval_instance_capacity() {
   local LOOK_BACK_PERIOD="30m"
   local TARGET_TYPE="${DESIRED_TYPE}"
   for retry in {1..30}; do
-    if err_count=$(curl -L -s "https://search.ci.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
+    if err_count=$(curl -L -s "https://search.dptools.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
       if [[ "${err_count}" == "0" ]]; then
         break  # Use DESIRED_TYPE
       else
@@ -149,7 +149,7 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 
 # Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[].ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
 if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
@@ -229,51 +229,39 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+# ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+# ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
 # excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
-  MIRROR_REGION="us-east-1"
-  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
-    MIRROR_REGION="${REGION}"
-  fi
+# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+#   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# imageContentSources:
+# - mirrors:
+#   - quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com
+#   source: quay.io
+# EOF
 
-  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
-  cat > "${PATCH}" << EOF
-imageContentSources:
-- mirrors:
-  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
-  source: quay.io
-EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+#   mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+#   pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
 
-  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
-  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
-
-  PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
-  cat > "${PATCH}" << EOF
-pullSecret: >
-  $(echo "${pull_secret_aws}" | jq -c .)
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-  rm "${PATCH}"
-fi
+#   PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
+#   cat > "${PATCH}" << EOF
+# pullSecret: >
+#   $(echo "${pull_secret_aws}" | jq -c .)
+# EOF
+#   yq-go m -x -i "${CONFIG}" "${PATCH}"
+#   rm "${PATCH}"
+# fi
 
 # custom rhcos ami for non-public regions
-RHCOS_AMI=
-if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
-  # TODO: move repo to a more appropriate location
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
-  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
-fi
+RHCOS_AMI=""
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
@@ -281,7 +269,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
 fi
 
-if [ ! -z ${RHCOS_AMI} ]; then
+if [ -n "${RHCOS_AMI}" ]; then
   echo "patching rhcos ami to install-config.yaml"
   CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
   cat >> "${CONFIG_PATCH_AMI}" << EOF

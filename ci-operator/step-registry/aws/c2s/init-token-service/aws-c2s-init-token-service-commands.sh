@@ -2,6 +2,21 @@
 
 set -o nounset
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 # ------------------------------------------------------------------------------------------------
 # Initialize temporary credential on C2S and SC2S regions
 # 1. Get credential from temporary credentional provider endpoint provided by SHIFT, 
@@ -150,18 +165,62 @@ function remove_tech_preview_feature_from_manifests()
 # ------------------------------
 
 cr_yaml_d=$(mktemp -d)
-echo "extracting CR from image $RELEASE_IMAGE_LATEST"
 
-oc adm release extract ${RELEASE_IMAGE_LATEST} --credentials-requests --cloud=aws --to "${cr_yaml_d}" || exit 1
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST, 
+# but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with 
+# user specified image pullspec, to avoid auth error when accessing it, always use build farm 
+# registry pullspec.
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
+# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
+if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
+    tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
+    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
+    tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+fi
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
+# higher priority than RELEASE_IMAGE_LATEST
+TESTING_RELEASE_IMAGE=""
+if [[ -n ${tmp_release_image_initial:-} ]]; then
+    TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+else
+    TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}
+fi
+echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
+
+echo "OC Version:"
+export PATH=${CLI_DIR:-}:$PATH
+which oc
+oc version --client
+oc adm release extract --help
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+
+dir=$(mktemp -d)
+pushd "${dir}" || exit 1
+cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+oc registry login --to pull-secret
+oc adm release extract --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --credentials-requests --cloud=aws --to "${cr_yaml_d}" ${ADDITIONAL_OC_EXTRACT_ARGS} || exit 1
+rm pull-secret
+popd || exit 1
 
 echo "Extracted CR files:"
 ls $cr_yaml_d
 
-annotation="TechPreviewNoUpgrade"
-remove_tech_preview_feature_from_manifests ${cr_yaml_d} ${annotation} || exit 1
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" != "true" ]] && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
+  remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "TechPreviewNoUpgrade" || exit 1
+fi
 
 credentials_requests_files=`mktemp`
-ls ${cr_yaml_d} > ${credentials_requests_files}
+ls -p "${cr_yaml_d}"/*.yaml | awk -F'/' '{print $NF}' > "${credentials_requests_files}"
 
 echo "CRs to be processed:"
 cat "${credentials_requests_files}"
@@ -233,7 +292,11 @@ EOF
 
 ca_file=`mktemp`
 cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" > ${ca_file}
-cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt" >> ${ca_file}
+else
+    cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+fi
 cat <<EOF > ${SHARED_DIR}/manifest_cap-token-certs-secret.yaml
 apiVersion: v1
 kind: Secret
@@ -325,11 +388,9 @@ EOF
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_minor_version >= 12 && ocp_major_version >= 4 )); then
+if version_ge "${ocp_version}" "4.12"; then
   echo "For 4.12+, using batch API version: batch/v1"
   cat <<EOF > /tmp/cap-token-cronjob_412plus-patch.yaml
 apiVersion: batch/v1

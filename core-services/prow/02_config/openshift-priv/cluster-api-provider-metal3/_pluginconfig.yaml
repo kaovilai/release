@@ -1,0 +1,15 @@
+approve:
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/cluster-api-provider-metal3
+  require_self_approval: false
+plugins:
+  openshift-priv/cluster-api-provider-metal3:
+    plugins:
+    - approve
+    - golint
+    - goose
+    - jira
+    - owners-label
+    - pony
+    - sigmention

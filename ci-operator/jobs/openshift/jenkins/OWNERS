@@ -8,11 +8,14 @@ approvers:
 - coreydaley
 - divyansh42
 - jkhelil
-- mbharatk
+- cspi-qe-ocp-lp
+- k37y
+- prdhamdh
 options: {}
 reviewers:
 - apoorvajagtap
 - coreydaley
 - divyansh42
 - jkhelil
-- mbharatk
+- k37y
+- prdhamdh

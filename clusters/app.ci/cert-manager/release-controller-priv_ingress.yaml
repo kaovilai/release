@@ -7,6 +7,7 @@ metadata:
   name: release-controller-priv
   namespace: ci
 spec:
+  ingressClassName: openshift-default
   tls:
     #release-controller-priv-tls has been used already for the service to store internal certs
     #https://github.com/openshift/release/blob/057272546cb7e86030d7c32cec3e67c657872ffa/clusters/app.ci/release-controller/deploy-ocp-priv-controller.yaml#L35
@@ -14,6 +15,8 @@ spec:
       hosts:
         - amd64.ocp.internal.releases.ci.openshift.org
         - arm64.ocp.internal.releases.ci.openshift.org
+        - multi.ocp.internal.releases.ci.openshift.org
+        - multi-2.ocp.internal.releases.ci.openshift.org
         - ppc64le.ocp.internal.releases.ci.openshift.org
         - s390x.ocp.internal.releases.ci.openshift.org
   rules:
@@ -32,6 +35,24 @@ spec:
       - backend:
           service:
             name: release-controller-api-ocp-arm64-priv
+            port:
+              number: 443
+        pathType: ImplementationSpecific
+  - host: multi.ocp.internal.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-api-ocp-multi-priv
+            port:
+              number: 443
+        pathType: ImplementationSpecific
+  - host: multi-2.ocp.internal.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-api-ocp-multi-2-priv
             port:
               number: 443
         pathType: ImplementationSpecific

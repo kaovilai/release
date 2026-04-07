@@ -25,11 +25,9 @@ filters:
   ^features/.*:
     reviewers:
     - abays
-    - davidvossel
     - derekhiggins
     - fedepaol
     - iranzo
-    - jlojosnegros
     - karmab
     - marioferh
     - marsik

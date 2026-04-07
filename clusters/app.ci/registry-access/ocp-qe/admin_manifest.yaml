@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
     openshift.io/description: Automation ServiceAccounts for OCP QE
     openshift.io/display-name: OCP QE
   name: ocp-qe
@@ -44,5 +45,6 @@ roleRef:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: ocp-qe-admins
+    # This is a group from Rover https://rover.redhat.com/groups/
+    name: openshift-qe-ci-admins
     namespace: ocp-qe

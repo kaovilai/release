@@ -16,15 +16,16 @@ ref:
       default: ''
       documentation: used to select the networkType to be used.
                      For example, OpenShiftSDN, OVNKubernetes, or Kuryr
+    - name: OVERRIDE_OPENSHIFT_SDN_DEPRECATION
+      default: ""
+      documentation: |-
+        If true, SDN will be installed by overriding the network.config.openshift.io
+        manifest.
     - name: OPENSTACK_EXTERNAL_NETWORK
       default: ''
       documentation: |-
         Name of the OpenStack public-facing network. Defaults to the value in
         "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
-    - name: OPENSTACK_PROVIDER_NETWORK
-      default: ''
-      documentation: |-
-        Name of the OpenStack provider network if any.
     - name: ADDITIONAL_WORKERS_NETWORKS
       default: ''
       documentation: |-
@@ -47,10 +48,6 @@ ref:
       documentation: |-
         Space-separated list of AZs that can be used when deploying the
         cluster. Defaults to the value in "${SHARED_DIR}/ZONES"
-    - name: ZONES_COUNT
-      default: "0"
-      documentation: |-
-        The number of AZs to present in the cluster. Accepted values are 0 and 1.
     - name: WORKER_REPLICAS
       default: "3"
       documentation: |-
@@ -64,6 +61,35 @@ ref:
                       require a proxy server to be deployed.
         * 'proxy' - Configure the install-config to use a pre-created restricted network (BYON) and
                    a Cluster Proxy.
+    - name: FEATURE_SET
+      default: ""
+      documentation: |-
+        This field sets the cluster feature set. This is used to enable custom features such as tech preview features.
+    - name: FEATURE_GATES
+      default: ""
+      documentation: |-
+        A comma-separated list of cluster feature gates. This is used to enable custom features.
+        Only to be used in conjunction with FEATURE_SET=CustomNoUpgrade.
+    - name: MACHINES_SUBNET_v4_RANGE
+      default: "192.168.25.0/24"
+      documentation: |-
+        CIDR of the IPv4 Machines Subnet
+    - name: MACHINES_SUBNET_v6_RANGE
+      default: "fd2e:6f44:5dd8:c956::/64"
+      documentation: |-
+        CIDR of the IPv6 Machines Subnet
+    - name: CONTROL_PLANE_SUBNET_V4
+      default: ""
+      documentation: |-
+        The control plane port v4 subnet name
+    - name: CONTROL_PLANE_SUBNET_V6
+      default: ""
+      documentation: |-
+        The control plane port v6 subnet name
+    - name: CONTROL_PLANE_NETWORK
+      default: ""
+      documentation: |-
+        The control plane port network name
   documentation: |-
     Generates install-config.yaml based on the requested CONFIG_TYPE.
     Saves the file as ${SHARED_DIR}/install-config.yaml. Load balancer IP and cluster

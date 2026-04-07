@@ -11,7 +11,7 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}"-"${UNIQUE_HASH}"
 
 mkdir -p "${HOME}"/.ssh
 mock-nss.sh
@@ -50,6 +50,13 @@ run-tests
 EOF
 
 chmod +x "${HOME}"/run-tests.sh
+
+export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+until gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh --zone "${GOOGLE_COMPUTE_ZONE}" packer@"${INSTANCE_PREFIX}" --command "exit 0" 2>/dev/null; do
+  echo "Waiting for SSH to become available..."
+  sleep 5
+done
+echo "SSH is now available for ${INSTANCE_PREFIX}"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \

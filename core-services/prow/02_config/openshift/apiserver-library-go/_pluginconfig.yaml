@@ -2,12 +2,10 @@ label:
   restricted_labels:
     openshift/apiserver-library-go:
     - allowed_users:
-      - soltysh
-      - stlaz
-      - sttts
-      - s-urbaniak
       - tkashem
-      - dmage
+      - p0lyn0mial
+      - benluddy
+      - vrutkovs
       label: backport-risk-assessed
     - allowed_users:
       - xingxingxia

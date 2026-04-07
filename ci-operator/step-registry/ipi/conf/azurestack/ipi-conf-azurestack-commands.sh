@@ -25,6 +25,7 @@ ENDPOINT="${AZURESTACK_ENDPOINT}"
 echo "ASH ARM Endpoint: ${ENDPOINT}"
 
 cp "/var/run/azurestack-cluster-secrets/service-principal" "${SHARED_DIR}/osServicePrincipal.json"
+cloud_name=${LEASED_RESOURCE}
 if [[ -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]]; then
     cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
     if [[ "${cloud_name}" == "WWT" ]]; then
@@ -42,7 +43,7 @@ baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
   azure:
-    baseDomainResourceGroupName: openshiftInstallerRG
+    baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP_NAME}
     region: ${LEASED_RESOURCE}
     cloudName: AzureStackCloud
     armEndpoint: ${ENDPOINT}
@@ -61,15 +62,22 @@ TENANT_ID=$(jq -r .tenantId "${SHARED_DIR}/osServicePrincipal.json")
 cat >> "${SHARED_DIR}/azurestack-login-script.sh" << EOF
 
 if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
-  cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
-  cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
-  export REQUESTS_CA_BUNDLE=/tmp/ca.pem
+    cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
+    if ls /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem > /dev/null 2>&1; then
+        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+    elif ls /go/src/github.com/openshift/installer/azure-cli/lib64/python*/site-packages/certifi/cacert.pem > /dev/null 2>&1; then
+        cat /go/src/github.com/openshift/installer/azure-cli/lib64/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+    else
+        echo "ERROR: unable to find cacert.pem in pyhton library that azure-cli depends on, exit..."
+        exit 1
+    fi
+    export REQUESTS_CA_BUNDLE=/tmp/ca.pem
 fi
 az cloud register \
-    -n ${LEASED_RESOURCE} \
+    -n ${cloud_name} \
     --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
     --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-az cloud set -n ${LEASED_RESOURCE}
+az cloud set -n ${cloud_name}
 az cloud update --profile 2019-03-01-hybrid
 az login --service-principal -u "$APP_ID" -p "$AAD_CLIENT_SECRET" --tenant "$TENANT_ID" > /dev/null
 EOF

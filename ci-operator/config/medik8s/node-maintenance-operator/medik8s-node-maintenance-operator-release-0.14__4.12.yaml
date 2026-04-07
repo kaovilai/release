@@ -10,9 +10,10 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.12
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: node-maintenance-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: node-maintenance-operator
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -34,8 +35,9 @@ tests:
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: medik8s-aws
     env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: nmo-install
       OO_PACKAGE: node-maintenance-operator

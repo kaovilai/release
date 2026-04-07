@@ -7,14 +7,15 @@ label:
   restricted_labels:
     openshift/openstack-test:
     - allowed_teams:
-      - openshift-patch-managers
+      - openshift-staff-engineers
       allowed_users:
       - mandre
+      - pierreprinetti
+      - stephenfin
       label: backport-risk-assessed
     - allowed_users:
-      - eurijon
       - itzikb-redhat
-      - rlobillo
+      - imatza-rh
       label: cherry-pick-approved
 lgtm:
 - repos:

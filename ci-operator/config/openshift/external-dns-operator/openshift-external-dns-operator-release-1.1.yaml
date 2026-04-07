@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -10,9 +6,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: external-dns-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: external-dns-operator
 operator:
   bundles:
   - as: external-dns-operator-bundle
@@ -50,8 +46,9 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -69,6 +66,7 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-aws
 - as: e2e-gcp-ovn-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     dependencies:
@@ -88,8 +86,9 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-gcp
 - as: e2e-azure-ovn-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -107,8 +106,9 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-azure
 - as: e2e-azure-ovn-infoblox-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:

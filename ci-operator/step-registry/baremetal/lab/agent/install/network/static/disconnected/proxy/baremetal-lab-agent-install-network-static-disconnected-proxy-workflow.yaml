@@ -5,10 +5,12 @@ workflow:
       - chain: baremetal-lab-agent-conf-disconnected-proxy
       - ref: baremetal-lab-agent-conf-static
       - ref: baremetal-lab-agent-install
-      - ref: enable-qe-catalogsource-disconnected
-      - ref: baremetal-lab-nfs-provisioner
     post:
-      - chain: baremetal-lab-post
+      - chain: baremetal-lab-agent-post
+      - ref: send-results-to-reportportal
+    env:
+      DISCONNECTED: "true"
+      CLUSTER_WIDE_PROXY: "true"
   documentation: |-
     The baremetal-lab-agent-install-network-static-disconnected workflow provides pre- and post- steps that provision and
     deprovision an ABI OpenShift cluster with a default configuration on a Baremetal lab,

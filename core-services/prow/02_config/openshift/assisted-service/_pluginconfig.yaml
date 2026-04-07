@@ -3,6 +3,21 @@ approve:
   repos:
   - openshift/assisted-service
   require_self_approval: false
+label:
+  restricted_labels:
+    openshift/assisted-service:
+    - allowed_users:
+      - andfasano
+      - bfournie
+      - patrickdillon
+      - sadasu
+      - zaneb
+      label: backport-risk-assessed
+    - allowed_users:
+      - bmanzari
+      - mhanss
+      - pamoedom
+      label: cherry-pick-approved
 lgtm:
 - repos:
   - openshift/assisted-service
@@ -16,5 +31,8 @@ triggers:
 - repos:
   - openshift/assisted-service
   trusted_apps:
+  - cve-automation
   - dependabot
   - openshift-edge-bot
+  - red-hat-konflux
+  - openshift-merge-bot

@@ -2,15 +2,12 @@
 	"path": "upi/vsphere/windows/pre/upi-vsphere-windows-pre-ref.yaml",
 	"owners": {
 		"approvers": [
-			"jcpowermac",
-			"rvanderp3",
-			"aravindhp",
-			"sebsoto"
+			"winc-approvers",
+			"vsphere-approvers"
 		],
 		"reviewers": [
-			"aravindhp",
-			"sebsoto",
-			"mansikulkarni96"
+			"winc-reviewers",
+			"vsphere-reviewers"
 		]
 	}
 }

@@ -7,13 +7,15 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 suffix=$(head /dev/urandom | tr -dc a-z0-9 | head -c 4)
-CLUSTER_NAME=${CLUSTER_NAME:-"ci-osd-ccs-$suffix"}
+CLUSTER_NAME=${CLUSTER_NAME:-"ci-osd-aws-$suffix"}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
 MULTI_AZ=${MULTI_AZ:-false}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
+FIPS=${FIPS:-false}
+REGION=${REGION:-"${LEASED_RESOURCE}"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
 default_compute_nodes=2
@@ -23,7 +25,6 @@ fi
 COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
 # Obtain aws credentials
-CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   AWS_ACCOUNT_ID=$(cat "${AWSCRED}" | grep aws_account_id | tr -d ' ' | cut -d '=' -f 2)
@@ -52,17 +53,9 @@ fi
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | tail -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
-  fi
+  OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | grep -i ec |tail -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | tail -1 || true)
-  fi
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep "^${OPENSHIFT_VERSION}" | tail -1 || true)
 else
   # Match the whole line
   OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "${OPENSHIFT_VERSION}" || true; })
@@ -72,14 +65,14 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   echo "Requested cluster version not available!"
   exit 1
 fi
-OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
+# OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
 echo "Select openshift version ${OPENSHIFT_VERSION}"
 
 # Cluster parameters
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  Cloud provider region: aws"
-echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
+echo "  Cloud provider region: ${REGION}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Compute nodes: ${COMPUTE_NODES}"
 echo "  Multi-az: ${MULTI_AZ}"
@@ -87,13 +80,14 @@ echo "  Openshift version: ${OPENSHIFT_VERSION}"
 echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
+echo "  Fips: ${FIPS}"
 
 # Cluster payload
 # Using the default aws credentials but not the user osdCcsAdmin's credentials to provision cluster
 CLUSTER_PAYLOAD=$(echo -e '{
   "name": "'${CLUSTER_NAME}'",
   "region": {
-    "id": "'${CLOUD_PROVIDER_REGION}'"
+    "id": "'${REGION}'"
   },
   "nodes": {
     "compute_machine_type": {
@@ -112,7 +106,7 @@ CLUSTER_PAYLOAD=$(echo -e '{
   "etcd_encryption": '${ETCD_ENCRYPTION}',
   "disable_user_workload_monitoring": '${DISABLE_WORKLOAD_MONITORING}',
   "version": {
-    "id": "'${OPENSHIFT_VERSION}'",
+    "id": "openshift-v'${OPENSHIFT_VERSION}'",
     "channel_group": "'${CHANNEL_GROUP}'"
   },
   "properties": {
@@ -129,6 +123,10 @@ CLUSTER_PAYLOAD=$(echo -e '{
   }
 }')
 
+if [[ "$FIPS" == "true" ]]; then
+  CLUSTER_PAYLOAD=$(echo "${CLUSTER_PAYLOAD}" | jq '. +={"fips":true}')
+fi
+
 echo "${CLUSTER_PAYLOAD}" | jq -c | ocm post /api/clusters_mgmt/v1/clusters > "${ARTIFACT_DIR}/cluster.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
@@ -136,6 +134,7 @@ mkdir -p "${SHARED_DIR}"
 CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
@@ -167,3 +166,6 @@ echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
 
 PRODUCT_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.product.id')
 echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
+
+INFRA_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.infra_id')
+echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"

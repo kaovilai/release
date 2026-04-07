@@ -1,6 +1,7 @@
 chain:
   as: cucushift-installer-rehearse-gcp-ipi-disconnected-private-provision
   steps: 
+  - ref: gcp-provision-minimal-permission
   - ref: openshift-cluster-bot-rbac
   - ref: gcp-provision-vpc
   - ref: ignition-bastionhost
@@ -12,7 +13,11 @@ chain:
   - ref: ipi-install-install
   - ref: ipi-install-times-collection
   - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
   - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-private
+  - ref: multiarch-validate-nodes
   env:
   - name: PUBLISH
     default:  "Internal"

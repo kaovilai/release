@@ -7,32 +7,21 @@
 approvers:
 - ashley-cui
 - baude
-- edsantiago
-- flouthoc
 - giuseppe
-- jwhonce
 - lsm5
 - mheon
 - mtrmac
-- rhatdan
-- saschagrunert
+- nalind
 - tomsweeneyredhat
-- umohnani8
-- vrothberg
 options: {}
 reviewers:
 - baude
-- cdoern
-- edsantiago
-- flouthoc
 - giuseppe
 - jwhonce
 - lsm5
 - mheon
 - mtrmac
-- qiwang19
-- rhatdan
-- saschagrunert
+- nalind
 - tomsweeneyredhat
 - umohnani8
 - vrothberg

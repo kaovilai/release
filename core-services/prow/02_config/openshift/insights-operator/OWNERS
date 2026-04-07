@@ -5,13 +5,13 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- baiyangzhou
+- katushiik11
 - ncaak
-- rhrmo
-- rluders
-- tremes
+- opokornyy
 options: {}
 reviewers:
+- baiyangzhou
+- katushiik11
 - ncaak
-- rhrmo
-- rluders
-- tremes
+- opokornyy

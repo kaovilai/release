@@ -16,9 +16,20 @@
             },
           },
           {
+            alert: 'ImagePullBackOff',
+            expr: 'sum(sum_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff"}[5m])) > 30',
+            'for': '10m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Many pods have been failing on pulling images. Please check the relevant events on the cluster.'
+            },
+          },
+          {
             alert: 'prow-job-backlog-growing',
             expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0',
-            'for': '60m',
+            'for': '10m',
             labels: {
               severity: 'critical',
             },
@@ -36,6 +47,44 @@
             annotations: {
               message: 'The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>'
             },
+          },
+          {
+            alert: 'TriggeredButPendingJobs',
+            expr: |||
+              sum by (job_name) (
+                increase(prowjob_state_transitions{state="triggered"}[15m])
+                - increase(prowjob_state_transitions{state="pending"}[15m])
+              ) > 20
+            |||,
+            'for': '10m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'There are {{ $value }} jobs that have been triggered but are still pending, indicating potential scheduling or resource constraints. Investigate pending Prow jobs. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=TriggeredButPendingJobs|Prometheus>.',
+            }
+          },
+          {
+            alert: 'TriggeredProwJobsPileup',
+            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak',
+            }
+          },
+          {
+            alert: 'SchedulingProwJobsPileup',
+            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
+            labels: {
+              severity: 'warning',
+            },
+            annotations: {
+              message: 'Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak',
+            }
           },
           {
             # We need this for a grafana variable, because grafana itself can only do extremely simplistic queries there

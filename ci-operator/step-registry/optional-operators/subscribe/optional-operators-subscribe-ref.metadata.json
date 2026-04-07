@@ -3,11 +3,13 @@
 	"owners": {
 		"approvers": [
 			"dirgim",
-			"samvarankashyap",
 			"jsztuka",
 			"14rcole",
+			"maneeshmehra",
+			"yashvardhannanavati",
 			"nmars",
-			"sonam1412"
+			"sonam1412",
+			"asergienk"
 		],
 		"reviewers": [
 			"anik120",
@@ -21,11 +23,13 @@
 			"kevinrizza",
 			"njhale",
 			"dirgim",
-			"samvarankashyap",
 			"jsztuka",
 			"14rcole",
 			"nmars",
-			"sonam1412"
+			"maneeshmehra",
+			"yashvardhannanavati",
+			"sonam1412",
+			"asergienk"
 		]
 	}
 }

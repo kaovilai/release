@@ -7,13 +7,22 @@ set -o verbose
 
 echo "************ baremetalds e2e assisted conf command ************"
 
+function get_provider_test_list() {
+    podman run --network host --rm -i \
+        -e KUBECONFIG=/tmp/kubeconfig -v ${KUBECONFIG}:/tmp/kubeconfig
+        ${OPENSHIFT_TESTS_IMAGE} \
+        openshift-tests run "openshift/conformance/parallel" \
+        --dry-run \
+        --provider '{"type":"${TEST_PROVIDER}"}'
+}
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 case "${CLUSTER_TYPE}" in
     vsphere)
         export TEST_PROVIDER=vsphere
         ;;
 
-    packet-edge|nutanix)
+    packet-edge|nutanix|oci-edge)
         export TEST_PROVIDER=baremetal
         ;;
 
@@ -34,7 +43,7 @@ EOF
         ;;
 
     conformance)
-        INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
+        INCL=$(get_provider_test_list)
         ;;
 
     full)

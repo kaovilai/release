@@ -41,7 +41,7 @@ echo "$(date -u --rfc-3339=seconds) - 'aliyun' authentication..."
 ALIYUN_PROFILE="${SHARED_DIR}/config"
 ${ALIYUN_BIN} configure set --config-path "${ALIYUN_PROFILE}"
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 REGION="${LEASED_RESOURCE}"
 
 VPC_CIDR='10.0.0.0/16'
@@ -112,7 +112,7 @@ for the_zone in "${nat_gateway_avail_zones[@]}"; do
 
     echo "$(date -u --rfc-3339=seconds) - AllocateEipAddress"
     ${ALIYUN_BIN} vpc AllocateEipAddress --RegionId "${REGION}" --InternetChargeType "PayByTraffic" \
-      --endpoint "${aliyun_vpc_endpoint}" > out.json
+    --Bandwidth 200 --endpoint "${aliyun_vpc_endpoint}" > out.json
     eip_id=$(jq -r '.AllocationId' out.json)
     eip_addr=$(jq -r '.EipAddress' out.json)
 

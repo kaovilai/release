@@ -2,19 +2,20 @@ build_root:
   project_image:
     dockerfile_path: ci-builder/Dockerfile
 images:
-- dockerfile_path: Dockerfile
-  to: ssp-operator-container
-- dockerfile_path: validator.Dockerfile
-  to: template-validator-container
+  items:
+  - dockerfile_path: Dockerfile
+    to: ssp-operator-container
+  - dockerfile_path: validator.Dockerfile
+    to: template-validator-container
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -26,6 +27,7 @@ resources:
 tests:
 - as: unittests
   steps:
+    cluster_profile: gcp-virtualization
     test:
     - as: unittests
       commands: export GOFLAGS= && make unittest

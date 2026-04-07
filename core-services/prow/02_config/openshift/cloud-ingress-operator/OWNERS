@@ -5,17 +5,20 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- abyrne55
 - boranx
-- cblecker
-- fahlmant
+- joshbranham
+- luis-falcon
 - sam-nguyen7
 options: {}
 reviewers:
-- bdematte
+- abyrne55
 - bng0y
 - boranx
-- fahlmant
-- lnguyen1401
+- dakotalongrh
+- luis-falcon
+- rafael-azevedo
+- reedcort
 - ritmun
 - robotmaxtron
 - sam-nguyen7

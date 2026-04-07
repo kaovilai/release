@@ -3,15 +3,10 @@ chain:
   steps:
   - chain: ipi-conf-aws
   - ref: sdn-conf
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
   - chain: ipi-install
   - ref: enable-qe-catalogsource
-  - ref: configure-registry-storage-deploy-s3-cloudfront 
-  env:
-  - name: CONTROL_PLANE_INSTANCE_TYPE
-    default: "m6i.xlarge"
-    documentation: "Instance type for control plane nodes"
-  - name: COMPUTE_NODE_TYPE
-    default: "m5.xlarge"
-    documentation: "Instance type for compute nodes"
+  - chain: cucushift-installer-check
   documentation: |-
     Create an IPI cluster on AWS with SDN for QE e2e tests.

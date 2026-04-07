@@ -1,37 +1,15 @@
-base_images:
-  stolostron_builder_nodejs18-linux:
-    name: builder
-    namespace: stolostron
-    tag: nodejs18-linux
-  stolostron_common-nodejs-parent_nodejs-18:
-    name: common-nodejs-parent
-    namespace: stolostron
-    tag: nodejs-18
 binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: nodejs18-linux
+    tag: nodejs20-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  inputs:
-    stolostron_builder_nodejs18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:nodejs18-linux
-    stolostron_common-nodejs-parent_nodejs-18:
-      as:
-      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-18
-  to: console
-- dockerfile_path: Dockerfile.mce.prow
-  inputs:
-    stolostron_builder_nodejs18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:nodejs18-linux
-    stolostron_common-nodejs-parent_nodejs-18:
-      as:
-      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-18
-  to: console-mce
+  items:
+  - dockerfile_path: Containerfile.acm
+    to: console
+  - dockerfile_path: Containerfile.mce
+    to: console-mce
 resources:
   '*':
     requests:
@@ -61,6 +39,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: console
+    env:
+      IMAGE_REPO: console
     workflow: ocm-ci-image-mirror
 - as: pr-image-mirror-mce
   steps:
@@ -69,12 +49,26 @@ tests:
     env:
       IMAGE_REPO: console-mce
     workflow: ocm-ci-image-mirror
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: console
     env:
+      IMAGE_REPO: console
       IMAGE_TAG: latest
     workflow: ocm-ci-image-mirror
 - as: latest-image-mirror-mce
@@ -90,7 +84,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.8
+      DESTINATION_BRANCH: release-2.17
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

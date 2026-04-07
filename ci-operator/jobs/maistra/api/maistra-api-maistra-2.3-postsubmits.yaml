@@ -4,27 +4,35 @@ postsubmits:
     always_run: true
     branches:
     - ^maistra-2\.3$
-    cluster: build01
+    cluster: build04
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-maistra-api-maistra-2.3-api-update-istio-2.3
+    name: branch-ci-maistra-api-maistra-2.3-api-update-istio-2-3
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/github-token
-        - --target=api-update-istio-2.3
+        - --secret-dir=/secrets/ossm-github
+        - --target=api-update-istio-2-3
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -32,8 +40,11 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /secrets/github-token
-          name: github-token
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /secrets/ossm-github
+          name: ossm-github
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -43,9 +54,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-token
+      - name: manifest-tool-local-pusher
         secret:
-          secretName: github-token
+          secretName: manifest-tool-local-pusher
+      - name: ossm-github
+        secret:
+          secretName: ossm-github
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

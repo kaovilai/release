@@ -1,10 +1,9 @@
-
 from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
 def _add_origin_rbac(gendoc):
-    gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+    gendoc.append_all([{
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-modify',
@@ -34,14 +33,35 @@ def _add_origin_rbac(gendoc):
                 'verbs': ['get',
                           'list',
                           'watch',
-                          'create']
+                          'create',
+                          'delete',
+                          'update',
+                          'patch']
             },
             {
                 'apiGroups': [''],
                 'resources': ['events'],
                 'verbs': ['create', 'patch', 'update']
             }]
-    })
+    }, {
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'release-controller-binding',
+            'namespace': 'origin',
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'release-controller-modify',
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'release-controller',
+            'namespace': 'ci'
+        }
+        ]
+    }])
 
 
 def _add_origin_resources(gendoc):
@@ -59,7 +79,7 @@ def _add_origin_resources(gendoc):
                 "host": "origin-release.apps.ci.l2s4.p1.openshiftapps.com",
                 "tls": {
                     "insecureEdgeTerminationPolicy": "Redirect",
-                    "termination": "Edge"
+                    "termination": "edge"
                 },
                 "to": {
                     "kind": "Service",
@@ -107,7 +127,10 @@ def _add_origin_resources(gendoc):
             "kind": "Deployment",
             "metadata": {
                 "annotations": {
-                    "image.openshift.io/triggers": "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"release-controller:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image\"}]",
+                    'keel.sh/policy': 'force',
+                    'keel.sh/matchTag': 'true',
+                    'keel.sh/trigger': 'poll',
+                    'keel.sh/pollSchedule': '@every 5m'
                 },
                 "name": "release-controller",
                 "namespace": "ci",
@@ -126,21 +149,79 @@ def _add_origin_resources(gendoc):
                         }
                     },
                     "spec": {
+                        "initContainers": [
+                            {
+                                "name": "git-sync-init",
+                                "command": ["/git-sync"],
+                                "args": [
+                                    "--repo=https://github.com/openshift/release.git",
+                                    "--ref=main",
+                                    "--root=/tmp/git-sync",
+                                    "--one-time=true",
+                                    "--depth=1"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GIT_SYNC_DEST",
+                                        "value": "release"
+                                    }
+                                ],
+                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
+                                "volumeMounts": [
+                                    {
+                                        "name": "release",
+                                        "mountPath": "/tmp/git-sync"
+                                    }
+                                ]
+                            }
+                        ],
                         "containers": [
+                            {
+                                "name": "git-sync",
+                                "command": ["/git-sync"],
+                                "args": [
+                                    "--repo=https://github.com/openshift/release.git",
+                                    "--ref=main",
+                                    "--period=30s",
+                                    "--root=/tmp/git-sync",
+                                    "--max-failures=3"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GIT_SYNC_DEST",
+                                        "value": "release"
+                                    }
+                                ],
+                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
+                                "volumeMounts": [
+                                    {
+                                        "name": "release",
+                                        "mountPath": "/tmp/git-sync"
+                                    }
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "memory": "1Gi",
+                                        "cpu": "0.5",
+                                    }
+                                }
+                            },
                             {
                                 "command": [
                                     "/usr/bin/release-controller",
                                     "--release-namespace=origin",
                                     "--prow-config=/etc/config/config.yaml",
                                     "--supplemental-prow-config-dir=/etc/config",
-                                    "--job-config=/etc/job-config",
+                                    "--job-config=/var/repo/release/ci-operator/jobs",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tools",
                                     "--release-architecture=amd64",
-                                    "-v=4"
+                                    "-v=4",
+                                    "--manifest-list-mode"
                                 ],
-                                "image": "release-controller:latest",
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
+                                'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rc_volume_mounts(),
                                 'livenessProbe': {
@@ -172,7 +253,10 @@ def _add_origin_resources(gendoc):
             "kind": "Deployment",
             "metadata": {
                 "annotations": {
-                    "image.openshift.io/triggers": "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"release-controller-api:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image\"}]",
+                    'keel.sh/policy': 'force',
+                    'keel.sh/matchTag': 'true',
+                    'keel.sh/trigger': 'poll',
+                    'keel.sh/pollSchedule': '@every 5m'
                 },
                 "name": "release-controller-api",
                 "namespace": "ci",
@@ -198,14 +282,16 @@ def _add_origin_resources(gendoc):
                                     "--release-namespace=origin",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tools",
                                     "--release-architecture=amd64",
                                     "--enable-jira",
-                                    "--jira-endpoint=https://issues.redhat.com",
-                                    "--jira-bearer-token-file=/etc/jira/api",
+                                    "--jira-endpoint=https://redhat.atlassian.net",
+                                    "--jira-username=brawilli@redhat.com",
+                                    "--jira-password-file=/etc/jira/password",
                                     "-v=4"
                                 ],
-                                "image": "release-controller-api:latest",
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
+                                'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rcapi_volume_mounts(),
                                 'livenessProbe': {

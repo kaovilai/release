@@ -1,6 +1,6 @@
 ref:
   as: ipi-install-powervs-install
-  from: installer
+  from: upi-installer
   grace_period: 2h
   commands: ipi-install-powervs-install-commands.sh
   cli: latest
@@ -20,7 +20,7 @@ ref:
     mount_path: /var/run/powervs-ipi-cicd-secrets/powervs-creds
   env:
   - name: BASE_DOMAIN
-    default: "ocp-dev-ppc64le.com"
+    default: "ipi-ppc64le.cis.ibm.net"
     documentation: |-
       A fully-qualified domain or subdomain name. The base domain of the cloud
       provider is used for setting baseDomain variable of the install
@@ -34,6 +34,9 @@ ref:
   - name: OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP
     default: ""
     documentation: "Send bootstrap logs to Loki. Warning: this should only be used for debugging purposes."
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: "true"
+    documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE

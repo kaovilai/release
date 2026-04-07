@@ -1,11 +1,30 @@
 # See the OWNERS_ALIASES docs: https://git.k8s.io/community/contributors/guide/owners.md#owners_aliases
 
 aliases:
+  staff-engineers:
+  - knobunc
+  - csrwng
+  - deads2k
+  - derekwaynecarr
+  - dgoodwin
+  - jerpeter1
+  - jhjaggars
+  - joelanford
+  - jupierce
+  - mrunalp
+  - Prashanth684
+  - spadgett
+  - sdodson
+  - stbenjam
+  - sjenning
+  - stleerh
+  - zaneb
   cincinnati-approvers:
-  - jottofar
-  - LalatenduMohanty
+  - DavidHurta
   - PratikMahajan
-  - vrutkovs
+  - hongkailiu
+  - fao89
+  - petr-muller
   - wking
   okd-approvers:
   - aleskandro
@@ -17,40 +36,34 @@ aliases:
   - travier
   - vrutkovs
   openstack-approvers:
-  - EmilienM
-  - MaysaMacedo
-  - dulek
+  - dkokkino
   - gryf
   - mandre
-  - mdbooth
-  - pierreprinetti
   - stephenfin
   openstack-reviewers:
-  - EmilienM
-  - MaysaMacedo
-  - dulek
+  - dkokkino
   - gryf
   - mandre
-  - mdbooth
-  - pierreprinetti
   - stephenfin
   dptp:
-  - bbguimaraes
   - droslean
-  - hongkailiu
   - jmguzik
   - smg247
   - bear-redhat
   - danilo-gemoli
+  - psalajova
+  - deepsm007
+  - Prucek
+  - hector-vido
+  - pruan-rht
+  - liangxia
   ovirt-approvers:
   - eslutsky
-  - janosdebugs
   - mmartinv
   - bkhizgiy
   - engelmi
   ovirt-reviewers:
   - eslutsky
-  - janosdebugs
   - mmartinv
   - bkhizgiy
   - engelmi
@@ -58,58 +71,54 @@ aliases:
   technical-release-team-approvers:
   - stbenjam
   - dgoodwin
+  - xueqzhan
+  - neisw
+  - sosiouxme
+  - smg247
+  - petr-muller
   technical-release-team-reviewers:
   - stbenjam
   - dgoodwin
   - xueqzhan
-  - DennisPeriquet
   - neisw
-  - deepsm007
+  - sosiouxme
+  - smg247
+  - petr-muller
   assisted-cicd:
   - romfreiman
-  - celebdor
   - eranco74
-  - filanov
-  - flaper87
-  - lranjbar
-  - osherdp
   - tsorya
-  - pawanpinjarkar
   - eliorerz
-  - mkowalski
-  - vrutkovs
   - omertuc
   - adriengentil
+  - danmanor
+  - rccrdpccl
+  - gamli75
   single-node:
   - romfreiman
   - eranco74
   - tsorya
-  - osherdp
   - omertuc
   - adriengentil
+  - danmanor
+  - eggfoobar
+  - jeff-roche
   edge-eco:
   - romfreiman
-  - celebdor
-  - filanov
   - tsorya
-  - osherdp
   - eliorerz
   - eranco74
   - omertuc
-  - lranjbar
-  - flaper87
-  - mkowalski
   - sagidayan
   - carbonin
   - adriengentil
+  - danmanor
+  - rccrdpccl
   coreos-approvers:
   - cgwalters
-  - bgilbert
   - dustymabe
   - mike-nguyen
   - jlebon
-  - ashcrow
-  - sohankunkerkar
   - travier
   - HuijingHei
   - jmarrero
@@ -118,18 +127,22 @@ aliases:
   - gursewak1997
   - marmijo
   - prestist
-  - RishabhSaini
   - jschintag
   - c4rt0
-  - Adam0Brien
+  - lukewarmtemp
+  - yasminvalim
+  - jbtrystram
+  - Johan-Liebert1
+  - joelcapitao
+  - tlbueno
+  - Roshan-R
+  - PeaceRebel
+  - Rolv-Apneseth
   coreos-reviewers:
   - cgwalters
-  - bgilbert
   - dustymabe
   - mike-nguyen
   - jlebon
-  - ashcrow
-  - sohankunkerkar
   - travier
   - HuijingHei
   - jmarrero
@@ -138,9 +151,16 @@ aliases:
   - gursewak1997
   - marmijo
   - prestist
-  - RishabhSaini
   - c4rt0
-  - Adam0Brien
+  - lukewarmtemp
+  - yasminvalim
+  - jbtrystram
+  - Johan-Liebert1
+  - joelcapitao
+  - tlbueno
+  - Roshan-R
+  - PeaceRebel
+  - Rolv-Apneseth
   ibmcloud-approvers:
   - cjschaef
   - hasueki
@@ -170,7 +190,11 @@ aliases:
   - dobsonj
   - gnufied
   - jsafrane
+  - RomanBednar
   - tsmetana
+  - mpatlasov
+  - duanwei33
+  - Phaow
   storage-reviewers:
   - bertinatto
   - dobsonj
@@ -178,69 +202,92 @@ aliases:
   - jsafrane
   - RomanBednar
   - tsmetana
+  - mpatlasov
+  - duanwei33
+  - Phaow
+  powervc-approvers:
+  - hamzy
+  - deepsm007
+  - mjturek
+  - prb112
+  powervc-reviewers:
+  - hamzy
+  - deepsm007
+  - mjturek
+  - prb112
+  - sudeeshjohn
   powervs-approvers:
   - hamzy
   - clnperez
-  - deepsm007
-  - r4f4
-  - jaypoulz
+  - mjturek
+  - prb112
+  - cs-zhang
+  - mkumatag
+  - keerthanaap
+  - sherine-k
+  - tvardema
   powervs-reviewers:
   - sudeeshjohn
-  - rpsene
   - hamzy
   - clnperez
+  - mjturek
   - mkumatag
-  - vijay-vin
-  - basavaraju-G
-  - deepsm007
-  - r4f4
-  - jaypoulz
-  sdn-approvers:
+  - prb112
+  - cs-zhang
+  - dharaneeshvrd
+  - keerthanaap
+  - sherine-k
+  - tvardema
+  core-networking-approvers:
   - abhat
   - danwinship
-  - dcbw
-  - dougbtv
-  - jluhrsen
-  - knobunc
-  - trozet
-  sdn-reviewers:
-  - abhat
-  - danwinship
-  - dcbw
-  - dougbtv
-  - jluhrsen
-  - knobunc
-  - trozet
-  - JacobTanenbaum
   - jcaamano
+  - jluhrsen
+  - knobunc
   - kyrtapz
+  - pliurh
+  - tssurya
+  core-networking-reviewers:
+  - abhat
+  - arghosh93
+  - arkadeepsen
+  - bpickard22
+  - danwinship
+  - jcaamano
+  - jluhrsen
+  - knobunc
+  - kyrtapz
+  - martinkennelly
+  - miheer
+  - pliurh
+  - pperiyasamy
+  - ricky-rav
   - tssurya
   - zshi-redhat
-  - pliurh
   nutanix-approvers:
   - elmiko
   - fedosin
   - joelspeed
+  - jcpowermac
   - rvanderp3
   nutanix-reviewers:
   - elmiko
   - fedosin
   - joelspeed
+  - jcpowermac
   - rvanderp3
   kmm-approvers:
   - bthurber
   - chr15p
   - enriquebelarte
-  - erusso7
-  - qbarrand
+  - mresvanis
   - ybettan
   - yevgeny-shnaidman
   kmm-reviewers:
   - bthurber
   - chr15p
   - enriquebelarte
-  - erusso7
-  - qbarrand
+  - mresvanis
   - ybettan
   - yevgeny-shnaidman
   maistra-approvers:
@@ -250,6 +297,15 @@ aliases:
   - dgn
   - bartoszmajsak
   - FilipB
+  - bmangoen
+  - mayleighnmyers
+  - fjglira
+  - maxbab
+  - yannuil
+  - mkralik3
+  - dcillera
+  - zmiklank
+  - pbajjuri20
   maistra-reviewers:
   - jwendell
   - rcernich
@@ -257,18 +313,25 @@ aliases:
   - dgn
   - bartoszmajsak
   - FilipB
+  - bmangoen
+  - mayleighnmyers
+  - fjglira
+  - maxbab
+  - yannuil
+  - mkralik3
+  - dcillera
+  - zmiklank
+  - pbajjuri20
   cspi-qe-ocp-lp:
-  - calebevans
-  - madunn
-  - btjd
-  - chetna14manku
-  - ascerra
-  - smatula
-  - liswang89
-  - adtandale
   - Sau1506mya
   - amp-rh
-  - macharya0907
+  - oharan2
+  - shakyav
+  - dfrazzette
+  - danalanerh
+  - sg-rh
+  - etirta
+  - tanfengshuang
   openstack-k8s-operators-approvers:
   - abays
   - arxcruz
@@ -278,7 +341,8 @@ aliases:
   - olliewalsh
   - raukadah
   - rlandy
-  - Sandeepyadav93
+  - cescgina
+  - frenzyfriday
   - stuggi
   - viroel
   openstack-k8s-operators-reviewers:
@@ -290,9 +354,11 @@ aliases:
   - olliewalsh
   - raukadah
   - rlandy
-  - Sandeepyadav93
+  - cescgina
+  - frenzyfriday
   - stuggi
   - viroel
+  - bshewale
   cspi-msi-approvers:
   - myakove
   - rnetser
@@ -301,10 +367,207 @@ aliases:
   - rnetser
   - omrirh
   - ILpinto
-  - oharan2
-  - shakyav
+  - chetna14manku
+  - rujutashinde
   amq-streams-approvers:
   - Frawless
   - im-konge
   - see-quick
   - jankalinic
+  kiali-approvers:
+  - jshaughn
+  - FilipB
+  - jmazzitelli
+  kiali-reviewers:
+  - jshaughn
+  - FilipB
+  - jmazzitelli
+  multiarch-approvers:
+  - andymcc
+  - Prashanth684
+  - sherine-k
+  - tvardema
+  - lwan-wanglin
+  - prb112
+  - mjturek
+  - hamzy
+  - keerthanaap
+  - v78singh
+  - amrutp-redhat
+  multiarch-reviewers:
+  - andymcc
+  - Prashanth684
+  - sherine-k
+  - tvardema
+  - alkleinrh
+  - phani2898
+  - veera-damisetti
+  - lwan-wanglin
+  - prb112
+  - mjturek
+  - hamzy
+  - keerthanaap
+  - v78singh
+  - amrutp-redhat
+  - chidanandbh
+  - phani2898
+  - veera-damisetti
+  jboss-fuse-approvers:
+  - smongiar
+  - mcarlett
+  - croway
+  microshift-reviewers:
+  - agullon
+  - copejon
+  - dhensel-rh
+  - eslutsky
+  - ggiguash
+  - jerpeter1
+  - jogeo
+  - pacevedom
+  - pmtk
+  - vanhalenar
+  microshift-approvers:
+  - copejon
+  - eslutsky
+  - ggiguash
+  - jerpeter1
+  - pacevedom
+  - pmtk
+  edge-enablement-reviewers:
+  - jerpeter1
+  - eggfoobar
+  - jeff-roche
+  - suleymanakbas91
+  - qJkee
+  - jaypoulz
+  - pacevedom
+  edge-enablement-approvers:
+  - jerpeter1
+  - eggfoobar
+  - jeff-roche
+  - suleymanakbas91
+  - brandisher
+  - qJkee
+  - jaypoulz
+  - pacevedom
+  vsphere-reviewers:
+  - jcpowermac
+  - patrickdillon
+  - rvanderp3
+  - vr4manta
+  vsphere-approvers:
+  - jcpowermac
+  - patrickdillon
+  - rvanderp3
+  - vr4manta
+  firewatch-owners:
+  - calebevans
+  - oharan2
+  - sg-rh
+  - shakyav
+  - amp-rh
+  image-based:
+  - eranco74
+  - javipolo
+  - mresvanis
+  - tsorya
+  - omertuc
+  - eliorerz
+  - danmanor
+  - giladravid16
+  envoy:
+  - jwendell
+  - rcernich
+  - dcillera
+  karpenter-approvers:
+  - elmiko
+  - enxebre
+  - jkyros
+  - joelsmith
+  - maxcao13
+  - muraee
+  karpenter-reviewers:
+  - elmiko
+  - enxebre
+  - jkyros
+  - joelsmith
+  - maxcao13
+  - muraee
+  winc-approvers:
+  - sebsoto
+  - mansikulkarni96
+  - jrvaldes
+  winc-reviewers:
+  - sebsoto
+  - mansikulkarni96
+  - jrvaldes
+  ocp-art:
+  - joepvd
+  - jupierce
+  - vfreex
+  - thegreyd
+  - ximinhan
+  - ashwindasr
+  - lgarciaaco
+  - locriandev
+  - mbiarnes
+  - rayfordj
+  ocp-sustaining:
+  - jkaurredhat
+  - sbiradar10
+  - namansharma18899
+  - germanparente
+  - san7ket
+  - rhdmalone
+  - shannon
+  - tonyxrmdavidson
+  ieng-chaos:
+  - etirta
+  - LibinLiu
+  - Userweiwei
+  perfscale-ocp-reviewers:
+  - afcollins
+  - akrzos
+  - ArthurChenCoding
+  - avasilevskii
+  - Balatripura587
+  - capolrik
+  - chentex
+  - josecastillolema
+  - jtaleric
+  - mcornea
+  - mohit-sheth
+  - mukrishn
+  - rsevilla87
+  - sandeepyadav93
+  - venkataanil
+  - vishnuchalla
+  perfscale-ocp-approvers:
+  - afcollins
+  - akrzos
+  - avasilevskii
+  - capolrik
+  - chentex
+  - josecastillolema
+  - jtaleric
+  - mcornea
+  - mohit-sheth
+  - mukrishn
+  - rsevilla87
+  - sandeepyadav93
+  - venkataanil
+  - vishnuchalla
+  perfscale-osp:
+  - masco
+  - smandaRH
+  perfscale-ocp-telco:
+  - afcollins
+  - sraviteja-maker
+  - HughNhan
+  osac-cicd:
+  - adriengentil
+  - jhernand
+  - akshaynadkarni
+  - larsks
+  - trewest

@@ -8,7 +8,7 @@ export PATH=/usr/libexec/origin:$PATH
 
 # Initial check
 case "${CLUSTER_TYPE}" in
-libvirt-ppc64le|libvirt-s390x|powervs*)
+libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*)
     ;;
 *)
     >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -300,9 +300,9 @@ test_suite = all_tests - excluded_tests
 for t in test_suite:
     print(t)
 EOSCRIPT
-      chmod +x ${SHARED_DIR}/invert_excluded.py
-      openshift-tests run "${TEST_SUITE}" --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
-      TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
+        chmod +x ${SHARED_DIR}/invert_excluded.py
+        openshift-tests run "${TEST_SUITE}" --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
+        TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
     fi
 
     case ${BRANCH} in
@@ -326,8 +326,31 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
         ;;
     esac
+	# Disabling the test until https://issues.redhat.com/browse/OCPBUGS-55458 is fixed.
+	case "${CLUSTER_TYPE}" in
+	powervs*)
+	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
+		;;
+	libvirt-ppc64le*)
+        TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
+        ;;
+	esac
 
     VERBOSITY="" # "--v 9"
+    set -x
+    openshift-tests run \
+        ${VERBOSITY} \
+        "${TEST_SUITE}" \
+        ${TEST_ARGS:-} \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
+}
+
+function heavy_build() {
+    TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
+    VERBOSITY="" # "--v 9"
+
     set -x
     openshift-tests run \
         ${VERBOSITY} \
@@ -374,6 +397,9 @@ jenkins-e2e-rhel-only)
     ;;
 image-ecosystem)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/image-ecosystem suite
+    ;;
+heavy-build)
+    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel heavy_build
     ;;
 upgrade)
     upgrade

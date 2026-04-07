@@ -1,32 +1,29 @@
 base_images:
-  base:
-    name: "4.13"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: aws-encryption-provider
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: aws-kms-encryption-provider
 promotion:
-  namespace: hypershift
-  tag: latest
+  to:
+  - name: "4.22"
+    namespace: ocp
 releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.22"
   latest:
     integration:
-      name: "4.13"
+      include_built_images: true
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -45,6 +42,16 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-external
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -3,18 +3,9 @@ branch-protection:
     openshift:
       repos:
         assisted-test-infra:
-          branches:
-            master:
-              protect: true
-            release-ocm-2.5:
-              protect: true
-            release-ocm-2.6:
-              protect: true
-            release-ocm-2.7:
-              protect: true
-            release-ocm-2.8:
-              protect: true
-          protect: false
+          include:
+          - ^master$
+          - ^release-ocm-[0-9.]+$
 slack_reporter_configs:
   openshift/assisted-test-infra:
     channel: '#assisted-deployment-ci'
@@ -34,11 +25,9 @@ tide:
     - lgtm
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress
-    - downstream-change-needed
     - jira/invalid-bug
     - needs-rebase
     repos:

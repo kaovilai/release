@@ -2,13 +2,10 @@
 	"path": "ipi/conf/gcp/windows-machineset/ipi-conf-gcp-windows-machineset-ref.yaml",
 	"owners": {
 		"approvers": [
-			"aravindhp",
-			"sebsoto"
+			"winc-approvers"
 		],
 		"reviewers": [
-			"aravindhp",
-			"sebsoto",
-			"mansikulkarni96"
+			"winc-reviewers"
 		]
 	}
 }

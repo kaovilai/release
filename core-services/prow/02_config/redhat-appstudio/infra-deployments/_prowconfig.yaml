@@ -13,10 +13,10 @@ tide:
     - lgtm
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress
+    - infra/hold-production
     - jira/invalid-bug
     - needs-rebase
     repos:

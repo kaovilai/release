@@ -21,7 +21,12 @@ ci_operator_dir="${base_dir}/ci-operator"
 
 cp -r "${ci_operator_dir}" "${workdir}"
 
-ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs"
+ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs" \
+--known-infra-file infra-build-farm-periodics.yaml \
+--known-infra-file infra-periodics.yaml \
+--known-infra-file infra-periodics-migrated.yaml \
+--known-infra-file infra-image-mirroring.yaml \
+--known-infra-file infra-periodics-origin-release-images.yaml
 
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
 	cat << EOF
@@ -29,7 +34,7 @@ ERROR: This check enforces that Prow Job configuration YAML files are generated
 ERROR: correctly. We have automation in place that generates these configs and
 ERROR: new changes to these job configurations should occur from a re-generation.
 
-ERROR: Run the following command to re-generate the Prow jobs:
+ERROR: Try do a `git rebase ...` and then run the following command to re-generate the Prow jobs:
 ERROR: $ make jobs
 
 ERROR: The following errors were found:

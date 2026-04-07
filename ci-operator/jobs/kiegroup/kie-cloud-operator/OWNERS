@@ -5,10 +5,7 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- spolti
-- tchughesiv
+- jakubschwan
 options: {}
 reviewers:
-- ruromero
-- spolti
-- tchughesiv
+- jakubschwan

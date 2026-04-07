@@ -3,25 +3,19 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make driver
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/ibm-vpc-block-csi-driver
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: ibm-vpc-block-csi-driver
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: ibm-vpc-block-csi-driver
 promotion:
-  name: 4.10-priv
-  namespace: ocp-private
+  to:
+  - name: 4.10-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -51,7 +45,8 @@ tests:
     make verify
   container:
     from: src
-- as: e2e-ibmcloud-csi
+- always_run: false
+  as: e2e-ibmcloud-csi
   optional: true
   steps:
     cluster_profile: ibmcloud
@@ -59,6 +54,10 @@ tests:
       TEST_SKIPS: Verify if offline PVC expansion works\| topology should provision
         a volume and schedule a pod with AllowedTopologies
     workflow: openshift-e2e-ibmcloud-csi
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-priv

@@ -10,9 +10,7 @@ approvers:
 - dhellmann
 - dtantsur
 - elfosardo
-- hardys
 - juliakreger
-- russellb
 - zaneb
 options: {}
 reviewers:
@@ -21,7 +19,5 @@ reviewers:
 - dhellmann
 - dtantsur
 - elfosardo
-- hardys
 - juliakreger
-- russellb
 - zaneb

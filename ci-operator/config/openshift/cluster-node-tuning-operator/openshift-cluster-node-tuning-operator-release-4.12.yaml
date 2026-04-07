@@ -3,30 +3,17 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-base-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.12
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel8
-  from: base
-  inputs:
-    ocp_builder_rhel-8-base-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: cluster-node-tuning-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel8
+    from: base
+    to: cluster-node-tuning-operator
 promotion:
-  name: "4.12"
-  namespace: ocp
+  to:
+  - name: "4.12"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -57,11 +44,11 @@ tests:
     from: src
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -85,18 +72,32 @@ tests:
           memory: 200Mi
       timeout: 4h30m0s
     workflow: ipi-gcp
+- as: e2e-gcp-pao-updating-profile
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-updating-profile
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 5h0m0s
+    workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local
   container:
     from: src
 - as: e2e-nightly
-  cron: 0 23 * * *
+  cron: 30 10 7 7 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: nightly
       cli: latest

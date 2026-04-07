@@ -2,9 +2,8 @@
 	"path": "openshift/e2e/vsphere/techpreview/upgrade/openshift-e2e-vsphere-techpreview-upgrade-workflow.yaml",
 	"owners": {
 		"approvers": [
-			"jcpowermac",
-			"patrickdillon",
-			"rvanderp3"
+			"vsphere-approvers",
+			"storage-approvers"
 		]
 	}
 }

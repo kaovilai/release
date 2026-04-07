@@ -2,16 +2,17 @@ base_images:
   base:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: unused
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: unused
 resources:
   '*':
     requests:
@@ -20,6 +21,8 @@ resources:
 tests:
 - as: lint
   commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
     make lint
   container:
     from: src
@@ -28,6 +31,11 @@ tests:
     make test
   container:
     from: src
+- as: scan-optional
+  commands: make scan
+  container:
+    from: src
+  optional: true
 - as: build
   commands: |
     make build
@@ -52,6 +60,18 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: backplane-cli-codecov-token
+- as: combined-release
+  commands: |
+    bash ci-release.sh
+    export GITHUB_TOKEN=$(cat /tmp/secret/GITHUB_TOKEN)
+    make release
+  container:
+    from: src
+  postsubmit: true
+  run_if_changed: ^VERSION.md$
+  secret:
+    mount_path: /tmp/secret
+    name: backplane-cli-release-token
 zz_generated_metadata:
   branch: main
   org: openshift

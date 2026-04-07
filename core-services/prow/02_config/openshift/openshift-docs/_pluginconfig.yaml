@@ -3,6 +3,9 @@ label:
     openshift/openshift-docs:
     - allowed_teams:
       - team-red-hat
+      label: cloud-experts
+    - allowed_teams:
+      - team-red-hat
       label: CNV
     - allowed_teams:
       - team-red-hat
@@ -30,15 +33,6 @@ label:
       label: OADP
     - allowed_teams:
       - team-red-hat
-      label: peer-review-in-progress
-    - allowed_teams:
-      - team-red-hat
-      label: peer-review-done
-    - allowed_teams:
-      - team-red-hat
-      label: peer-review-needed
-    - allowed_teams:
-      - team-red-hat
       label: RHACS
     - allowed_teams:
       - team-red-hat
@@ -55,7 +49,19 @@ label:
     - allowed_teams:
       - team-red-hat
       label: telco
+    - allowed_teams:
+      - team-red-hat
+      label: sme-review-done
+    - allowed_teams:
+      - team-red-hat
+      label: sme-review-needed
 plugins:
   openshift/openshift-docs:
     plugins:
     - size
+triggers:
+- repos:
+  - openshift/openshift-docs
+  trusted_apps:
+  - cnv-bot-axuba
+  - openshift-merge-bot

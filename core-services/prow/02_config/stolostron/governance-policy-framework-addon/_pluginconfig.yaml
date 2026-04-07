@@ -7,4 +7,6 @@ triggers:
   - stolostron/governance-policy-framework-addon
   trusted_apps:
   - magic-mirror-bot
-  - red-hat-trusted-app-pipeline
+  - red-hat-konflux
+  - dependabot
+  - openshift-merge-bot

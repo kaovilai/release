@@ -5,18 +5,13 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- deads2k
-- s-urbaniak
-- stlaz
-- sttts
-- thejasn
+- bharath-b-rh
+- mytreya-rh
+- swghosh
 - trilokgeer
 options: {}
 reviewers:
-- deads2k
-- s-urbaniak
-- stlaz
-- sttts
+- bharath-b-rh
+- mytreya-rh
 - swghosh
-- thejasn
 - trilokgeer

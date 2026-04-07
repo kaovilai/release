@@ -9,13 +9,11 @@ filters:
     approvers:
     - alanconway
     - jcantrill
-    - periklis
     reviewers:
     - alanconway
-    - aminesnow
     - btaani
     - jcantrill
-    - periklis
+    - joaobravecoding
     - shwetaap
     - syedriko
     - vimalk78

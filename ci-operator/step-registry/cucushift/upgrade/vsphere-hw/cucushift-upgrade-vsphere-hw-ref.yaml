@@ -1,9 +1,8 @@
- ref:
+ref:
   as: cucushift-upgrade-vsphere-hw
   from: upi-installer
   grace_period: 10m
   commands: cucushift-upgrade-vsphere-hw-commands.sh
-  cli: latest
   resources:
     requests:
       cpu: 10m

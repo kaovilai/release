@@ -1,55 +1,25 @@
 base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.12_cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ./Dockerfile.assisted-installer.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: agent-installer-orchestrator
-- dockerfile_path: ./Dockerfile.assisted-installer-controller.ocp
-  from: base
-  inputs:
-    ocp_4.12_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.12:cli
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: agent-installer-csr-approver
+  items:
+  - dockerfile_path: ./Dockerfile.assisted-installer.ocp
+    to: agent-installer-orchestrator
+  - dockerfile_path: ./Dockerfile.assisted-installer-controller.ocp
+    to: agent-installer-csr-approver
 promotion:
-  name: "4.14"
-  namespace: ocp
+  to:
+  - name: "4.22"
+    namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -57,12 +27,61 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-agent-compact
-  cluster: build05
+- as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
+- always_run: false
+  as: e2e-agent-sno-ipv6
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+- always_run: false
+  as: e2e-agent-ha-dualstack
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+    workflow: agent-e2e-generic
+- always_run: false
+  as: e2e-agent-4control-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
+    workflow: agent-e2e-generic
+- always_run: false
+  as: e2e-agent-5control-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
+    workflow: agent-e2e-generic
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift

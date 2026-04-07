@@ -13,6 +13,10 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 
+# copy pull-secret
+ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir -p /root/.docker"
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/.docker/config.json"
+
 echo "### Setting up tests"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     # install and start docker
@@ -27,8 +31,9 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     systemctl enable --now docker
 
     # install skipper
-    dnf install -y  python3-pip
-    pip3 install strato-skipper
+    dnf install -y python3-pip
+    pip3 install --upgrade pip
+    pip3 install strato-skipper==2.0.2
 
     # misc tools
     dnf install -y sos

@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   driver-operand:
     name: "4.15"
     namespace: ocp
@@ -11,14 +7,6 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -35,27 +23,19 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: csi-node-driver-registrar
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
 binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: aws-efs-csi-operator-create-efs
+  items:
+  - dockerfile_path: Dockerfile
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
   - as: aws-efs-csi-driver-operator-bundle
@@ -77,8 +57,9 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -106,21 +87,39 @@ tests:
   container:
     from: src
 - as: operator-e2e
-  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
-      CLUSTERCSIDRIVER: efs.csi.aws.com
       OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
-      OO_PACKAGE: aws-efs-csi-driver-operator
-      OO_TARGET_NAMESPACES: '!all'
-      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
       TEST_SUITE: openshift/csi
-      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
     workflow: openshift-e2e-aws-csi-efs
+- always_run: false
+  as: operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
+- as: nightly-operator-e2e
+  cron: 56 12 14 6 *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

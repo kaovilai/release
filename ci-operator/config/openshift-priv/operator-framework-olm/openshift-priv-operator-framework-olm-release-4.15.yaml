@@ -1,45 +1,21 @@
-base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-olm
 images:
-- dockerfile_path: operator-lifecycle-manager.Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: operator-lifecycle-manager
-- dockerfile_path: operator-registry.Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: operator-registry
-- dockerfile_path: base.Dockerfile
-  from: src
-  to: ci-image
+  items:
+  - dockerfile_path: operator-lifecycle-manager.Dockerfile
+    to: operator-lifecycle-manager
+  - dockerfile_path: operator-registry.Dockerfile
+    to: operator-registry
+  - dockerfile_path: base.Dockerfile
+    from: src
+    to: ci-image
 promotion:
-  excluded_images:
-  - ci-image
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - excluded_images:
+    - ci-image
+    name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -61,6 +37,7 @@ tests:
   container:
     from: ci-image
 - as: e2e-gcp-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -87,12 +64,21 @@ tests:
   container:
     from: ci-image
 - as: e2e-gcp-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     test:
     - as: test
       cli: latest
       commands: |
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+
         export JUNIT_DIRECTORY=${ARTIFACT_DIR}
         # Skip the flake tests, which are ran in a separate job
         export SKIP='\[FLAKE\]'
@@ -100,11 +86,14 @@ tests:
         export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
         make e2e/olm
       from: ci-image
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-olm-flaky
+- always_run: false
+  as: e2e-gcp-olm-flaky
   optional: true
   steps:
     cluster_profile: gcp
@@ -118,6 +107,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-gcp-console-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     test:
@@ -130,8 +120,9 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.15

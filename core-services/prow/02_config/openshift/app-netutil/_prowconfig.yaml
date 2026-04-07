@@ -1,11 +1,39 @@
 tide:
   queries:
   - includedBranches:
+    - openshift-4.22
+    - release-4.22
+    labels:
+    - approved
+    - backport-risk-assessed
+    - jira/valid-bug
+    - lgtm
+    - staff-eng-approved
+    - verified
+    missingLabels:
+    - backports/unvalidated-commits
+    - do-not-merge/hold
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/work-in-progress
+    - jira/invalid-bug
+    - needs-rebase
+    repos:
+    - openshift/app-netutil
+  - includedBranches:
+    - openshift-4.21
     - release-4.0
     - release-4.10
     - release-4.11
     - release-4.12
-    - release-4.2
+    - release-4.13
+    - release-4.14
+    - release-4.15
+    - release-4.16
+    - release-4.17
+    - release-4.18
+    - release-4.19
+    - release-4.20
+    - release-4.21
     - release-4.3
     - release-4.4
     - release-4.5
@@ -16,30 +44,11 @@ tide:
     labels:
     - approved
     - backport-risk-assessed
-    - bugzilla/valid-bug
-    - cherry-pick-approved
+    - jira/valid-bug
     - lgtm
+    - verified
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
-    - do-not-merge/hold
-    - do-not-merge/invalid-owners-file
-    - do-not-merge/work-in-progress
-    - jira/invalid-bug
-    - needs-rebase
-    repos:
-    - openshift/app-netutil
-  - includedBranches:
-    - release-4.13
-    labels:
-    - approved
-    - backport-risk-assessed
-    - bugzilla/valid-bug
-    - cherry-pick-approved
-    - lgtm
-    missingLabels:
-    - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress
@@ -53,9 +62,9 @@ tide:
     labels:
     - approved
     - lgtm
+    - verified
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress
@@ -73,7 +82,16 @@ tide:
     - release-4.11
     - release-4.12
     - release-4.13
+    - release-4.14
+    - release-4.15
+    - release-4.16
+    - release-4.17
+    - release-4.18
+    - release-4.19
     - release-4.2
+    - release-4.20
+    - release-4.21
+    - release-4.22
     - release-4.3
     - release-4.4
     - release-4.5
@@ -86,7 +104,6 @@ tide:
     - lgtm
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress

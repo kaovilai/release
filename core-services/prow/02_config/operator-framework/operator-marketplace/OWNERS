@@ -6,17 +6,22 @@
 
 approvers:
 - anik120
-- awgreene
+- camilamacedo86
+- grokspawn
+- jianzhangbjz
 - joelanford
 - kevinrizza
+- oceanc80
 - perdasilva
+- tmshort
 options: {}
 reviewers:
 - anik120
 - ankitathomas
-- awgreene
-- benluddy
-- dinhxuanvu
-- gallettilance
-- hasbro17
+- camilamacedo86
+- fgiudici
+- grokspawn
 - kevinrizza
+- oceanc80
+- rashmigottipati
+- tmshort

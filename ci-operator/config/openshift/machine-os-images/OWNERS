@@ -8,16 +8,18 @@ approvers:
 - cgwalters
 - dtantsur
 - elfosardo
-- hardys
+- honza
+- hroyrh
+- iurygregory
 - jlebon
-- sadasu
 - zaneb
 options: {}
 reviewers:
 - cgwalters
 - dtantsur
 - elfosardo
-- hardys
+- honza
+- hroyrh
+- iurygregory
 - jlebon
-- sadasu
 - zaneb

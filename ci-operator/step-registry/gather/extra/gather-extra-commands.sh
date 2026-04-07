@@ -34,13 +34,26 @@ then
 fi
 
 echo "Gathering artifacts ..."
-mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
+mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds ${ARTIFACT_DIR}/inspect
 
 oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
 oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
 oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
 
-queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+oc --insecure-skip-tls-verify --request-timeout=5s adm inspect clusteroperators --dest-dir ${ARTIFACT_DIR}/inspect || true
+
+PLATFORM=$(oc get infrastructure cluster -o jsonpath="{.status.platform}")
+CAPI_PLATFORM=$(echo "$PLATFORM" | tr '[:upper:]' '[:lower:]')
+
+if [[ "${CAPI_PLATFORM}" == "baremetal" ]]; then
+  CAPI_PLATFORM=metal3
+fi
+
+if [[ "${CAPI_PLATFORM}" == "powervs" ]]; then
+  CAPI_PLATFORM=ibmpower
+fi
+
+queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io,authentication.config.openshift.io,build.config.openshift.io,console.config.openshift.io,dns.config.openshift.io,featuregate.config.openshift.io,image.config.openshift.io,infrastructure.config.openshift.io,ingress.config.openshift.io,network.config.openshift.io,oauth.config.openshift.io,project.config.openshift.io,scheduler.config.openshift.io -o json
 queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
 queue ${ARTIFACT_DIR}/oc_cmds/apiservices oc --insecure-skip-tls-verify --request-timeout=5s get apiservices
 queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
@@ -54,12 +67,17 @@ queue ${ARTIFACT_DIR}/oc_cmds/credentialsrequests oc --insecure-skip-tls-verify 
 queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
 queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/endpoints oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces
+queue ${ARTIFACT_DIR}/endpointslices.json oc --insecure-skip-tls-verify --request-timeout=5s get endpointslices --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/endpointslices oc --insecure-skip-tls-verify --request-timeout=5s get endpointslices --all-namespaces
 FILTER=gzip queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/deployments oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o wide
 FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/daemonsets oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o wide
+FILTER=gzip queue ${ARTIFACT_DIR}/jobs.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get jobs.batch --all-namespaces -o json
 queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/events oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces
+queue ${ARTIFACT_DIR}/featuregate.json oc --insecure-skip-tls-verify --request-timeout=5s get featuregate -o json
+queue ${ARTIFACT_DIR}/oc_cmds/featuregate oc --insecure-skip-tls-verify --request-timeout=5s get featuregate
 queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
 queue ${ARTIFACT_DIR}/oc_cmds/kubeapiserver oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver
 queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
@@ -70,10 +88,24 @@ queue ${ARTIFACT_DIR}/machineconfigs.json oc --insecure-skip-tls-verify --reques
 queue ${ARTIFACT_DIR}/oc_cmds/machineconfigs oc --insecure-skip-tls-verify --request-timeout=5s get machineconfigs
 queue ${ARTIFACT_DIR}/controlplanemachinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get controlplanemachinesets -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/controlplanemachinesets oc --insecure-skip-tls-verify --request-timeout=5s get controlplanemachinesets -A
-queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A -o json
-queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets -A
-queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o json
-queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines -A -o wide
+queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A
+queue ${ARTIFACT_DIR}/machinesets.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/machinesets.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o wide
+queue ${ARTIFACT_DIR}/machines.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/machines.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o wide
+queue ${ARTIFACT_DIR}/clusters.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get clusters.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusters.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get clusters.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/clusterapis.operator.openshift.io.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterapis.operator.openshift.io -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusterapis.operator.openshift.io oc --insecure-skip-tls-verify --request-timeout=5s get clusterapis.operator.openshift.io
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
@@ -102,6 +134,10 @@ queue ${ARTIFACT_DIR}/subscriptions.json oc --insecure-skip-tls-verify --request
 queue ${ARTIFACT_DIR}/oc_cmds/subscriptions oc --insecure-skip-tls-verify --request-timeout=5s get subscriptions --all-namespaces
 queue ${ARTIFACT_DIR}/clusterserviceversions.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/clusterserviceversions oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces
+queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-timeout=5s adm release info -o json
+queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
+queue ${ARTIFACT_DIR}/networkpolicies.json oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/networkpolicies oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
@@ -110,7 +146,6 @@ while IFS= read -r i; do
   mkdir -p ${ARTIFACT_DIR}/nodes/$i
   queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
-  FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal-previous.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --boot=-1
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
 done < /tmp/nodes
 
@@ -140,31 +175,38 @@ done
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
-oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
+
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+
+oc get node -oname | xargs oc adm must-gather $VOLUME_PERCENTAGE_FLAG -- /usr/bin/gather_multus_logs
 popd || return
 
-# If the tcpdump-service step was used, grab the pcap files.
-echo "INFO: gathering quay tcpdump packet headers if present"
-output_dir="${ARTIFACT_DIR}/tcpdump/"
-mkdir -p "$output_dir"
+# If the tcpdump-service or conntrackdump-service step was used, grab the files.
+for capture_type in tcpdump conntrackdump; do
+  echo "INFO: gathering ${capture_type} information if present"
+  output_dir="${ARTIFACT_DIR}/${capture_type}/"
+  mkdir -p "$output_dir"
 
-# Skip downloading of .terminating and .lock files.
-oc adm node-logs --role=worker --path="/tcpdump" | \
-grep -v ".terminating" | \
-grep -v ".lock" | \
-tee "${output_dir}.tcpdump_listing"
+  # Skip downloading of .terminating and .lock files.
+  oc adm node-logs -l kubernetes.io/os=linux --path="/${capture_type}" | \
+  grep -v ".terminating" | \
+  grep -v ".lock" | \
+  tee "${output_dir}.${capture_type}_listing"
+  cat "${output_dir}.${capture_type}_listing"
 
-cat "${output_dir}.tcpdump_listing"
-
-# The ${output_dir}.tcpdump_listing file contains lines with the node and filename
-# separated by a space.
-while IFS= read -r item; do
-node=$(echo $item |cut -d ' ' -f 1)
-fname=$(echo $item |cut -d ' ' -f 2)
-echo "INFO: Queueing download/gzip of /tcpdump/${fname} from ${node}";
-echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
-FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
-done < ${output_dir}.tcpdump_listing
+  # The ${output_dir}.${capture_type}_listing file contains lines with the node and filename
+  # separated by a space.
+  while IFS= read -r item; do
+    node=$(echo $item |cut -d ' ' -f 1)
+    fname=$(echo $item |cut -d ' ' -f 2)
+    echo "INFO: Queueing download/gzip of /${capture_type}/${fname} from ${node}";
+    echo "INFO: gziping to ${output_dir}/${node}-${fname}.gz";
+    FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/${capture_type}/${fname}
+  done < ${output_dir}.${capture_type}_listing
+done
 
 # Gather etcd strace and pprof output if present:
 echo "INFO: Fetching debug info from etcd pods if present"
@@ -186,6 +228,7 @@ function gather_network() {
   local namespace=$1
   local selector=$2
   local container=$3
+  local netfilter=$4
 
   if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
     echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
@@ -194,10 +237,13 @@ function gather_network() {
 
   local podlist="/tmp/${namespace}-pods"
 
-  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  # Snapshot iptables/nftables rules on each node
   oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
   while IFS= read -r i; do
     queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+    if [[ ${netfilter} == "nftables" ]]; then
+      queue ${ARTIFACT_DIR}/network/nft-list-ruleset-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i nft list ruleset
+    fi
   done < ${podlist}
   # Snapshot all used ports on each node.
   while IFS= read -r i; do
@@ -206,8 +252,19 @@ function gather_network() {
 }
 
 # Gather network details both from SDN and OVN. One of them should succeed.
-gather_network openshift-sdn app=sdn sdn
-gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
+gather_network openshift-sdn app=sdn sdn iptables
+sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
+sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
+if [ "${sample_node}" = "${sample_node_zone}" ]; then
+  echo "INFO: INTERCONNECT MODE"
+  ovnkube_container=ovnkube-controller
+  ovnkube_netfilter=nftables
+else
+  echo "INFO: LEGACY MODE"
+  ovnkube_container=ovnkube-node
+  ovnkube_netfilter=iptables
+fi
+gather_network openshift-ovn-kubernetes app=ovnkube-node ${ovnkube_container} ${ovnkube_netfilter}
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
@@ -217,8 +274,12 @@ done < /tmp/pods-api
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
-  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
-  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+  options=""
+  if [[ $i == *"dns-default"* ]]; then
+      options="--timestamps"
+  fi
+  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs ${options} --request-timeout=20s $i
+  FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs ${options} --request-timeout=20s -p $i
 done < /tmp/containers
 
 prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )"
@@ -254,6 +315,16 @@ if [[ -n "${prometheus}" ]]; then
 else
 	echo "Unable to find a Prometheus pod to snapshot."
 fi
+
+echo "Adding debug tools link to sippy for intervals"
+if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+  extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+else
+  extra_args="${JOB_NAME}"
+fi
+cat >> ${SHARED_DIR}/custom-links.txt << EOF
+<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+EOF
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
@@ -347,13 +418,39 @@ ${t_all}     cluster:usage:cpu:total:seconds:quantile      label_replace(quantil
 ${t_install} cluster:usage:cpu:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
 ${t_test}    cluster:usage:cpu:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
 
+${t_test}    cluster:outage:kubelet:metrics:total:seconds      sum(sum_over_time((1 - up{job="kubelet",metrics_path="/metrics"})[8h:1s])) by (metrics_path)
+
+${t_all}     cluster:usage:cpu:kubelet:total:seconds:quantile      label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
+${t_install} cluster:usage:cpu:kubelet:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
+${t_test}    cluster:usage:cpu:kubelet:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
+
+${t_all}     cluster:usage:cpu:crio:total:seconds:quantile      label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
+${t_install} cluster:usage:cpu:crio:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
+${t_test}    cluster:usage:cpu:crio:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
+
 ${t_all}     cluster:usage:cpu:total:seconds   sum(increase(container_cpu_usage_seconds_total{id="/"}[${d_all}]))
 ${t_install} cluster:usage:cpu:install:seconds sum(increase(container_cpu_usage_seconds_total{id="/"}[${d_install}]))
 ${t_test}    cluster:usage:cpu:test:seconds    sum(increase(container_cpu_usage_seconds_total{id="/"}[${d_test}]))
 
+${t_all}     cluster:usage:cpu:kubelet:total:seconds   sum(increase(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:kubelet:install:seconds sum(increase(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:kubelet:test:seconds    sum(increase(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_test}]))
+
+${t_all}     cluster:usage:cpu:crio:total:seconds   sum(increase(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:crio:install:seconds sum(increase(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:crio:test:seconds    sum(increase(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_test}]))
+
 ${t_all}     cluster:usage:cpu:total:rate   sum(rate(container_cpu_usage_seconds_total{id="/"}[${d_all}]))
 ${t_install} cluster:usage:cpu:install:rate sum(rate(container_cpu_usage_seconds_total{id="/"}[${d_install}]))
 ${t_test}    cluster:usage:cpu:test:rate    sum(rate(container_cpu_usage_seconds_total{id="/"}[${d_test}]))
+
+${t_all}     cluster:usage:cpu:kubelet:total:rate   sum(rate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:kubelet:install:rate sum(rate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:kubelet:test:rate    sum(rate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_test}]))
+
+${t_all}     cluster:usage:cpu:crio:total:rate   sum(rate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:crio:install:rate sum(rate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:crio:test:rate    sum(rate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_test}]))
 
 ${t_all}     cluster:usage:cpu:control_plane:total:avg   avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_all}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
 ${t_install} cluster:usage:cpu:control_plane:install:avg avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_install}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
@@ -383,9 +480,33 @@ ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quan
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
 
+${t_all}     cluster:usage:mem:rss:kubelet:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_rss{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:rss:kubelet:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:rss:kubelet:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:mem:rss:crio:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_rss{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:rss:crio:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:rss:crio:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.99", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:mem:working_set:kubelet:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:working_set:kubelet:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:working_set:kubelet:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:mem:working_set:crio:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:working_set:crio:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:working_set:crio:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:memory:kubelet:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/kubelet.service"}[${t_all}])) by (node))
+${t_install} cluster:usage:memory:kubelet:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/kubelet.service"}[${t_install}])) by (node))
+${t_test}    cluster:usage:memory:kubelet:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/kubelet.service"}[${t_test}])) by (node))
+
+${t_all}     cluster:usage:memory:crio:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/crio.service"}[${t_all}])) by (node))
+${t_install} cluster:usage:memory:crio:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/crio.service"}[${t_install}])) by (node))
+${t_test}    cluster:usage:memory:crio:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/crio.service"}[${t_test}])) by (node))
 
 ${t_all}     cluster:usage:memory:kube_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_all}])) by (pod))
 ${t_install} cluster:usage:memory:kube_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
@@ -451,6 +572,57 @@ ${t_all}     cluster:etcd:write:requests:latency:total:quantile histogram_quanti
 ${t_install} cluster:etcd:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_install}])) by (le,scope))
 ${t_test}    cluster:etcd:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_test}])) by (le,scope))
 
+# Gather the aggregated etcd P999, P99, P95, P50 values for WAL fsync, backend commit durations, network RTT for the entire job duration
+# We first aggregate buckets across all 3 instances and then calculate the percentile bands
+
+# WAL fsync duration
+${t_test}    cluster:etcd:disk:wal:fsync:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p95:aggregated:quantile histogram_quantile(0.95, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p50:aggregated:quantile histogram_quantile(0.50, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+
+# Backend commit duration
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p95:quantile histogram_quantile(0.95, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p50:quantile histogram_quantile(0.50, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+
+# Network RTT
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p95:quantile histogram_quantile(0.95, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p50:quantile histogram_quantile(0.50, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+
+# Gather the max etcd P999, P99, P95, P50 values for WAL fsync, backend commit durations, network RTT for the entire job duration
+# same as above but we take the max value across all 3 instances instead of aggregating the buckets
+# This would effectively be the slowest instance
+
+# WAL fsync duration
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+
+# Backend commit duration
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+
+# Network RTT
+${t_test}    cluster:etcd:network:rtt:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+
+# Gather the percent of etcd grpc server handled requests that failed
+# This only tallies the failure for severe errors and ignores client side error types
+${t_test}    cluster:etcd:grpc:server:handled:test:error:percent 100 * ( sum(rate(grpc_server_handled_total{ job=~".*etcd.*", grpc_code=~"Internal|Unavailable|DataLoss|DeadlineExceeded|ResourceExhausted|Unknown" }[${d_test}])) / sum(rate(grpc_server_handled_total{job=~".*etcd.*"}[${d_test}])) )
+
+# Gather the total number of slow apply requests over the duration of the test
+# May indicate overloaded disk/network/cpu or all of the above so not directly useful but worth seeing if there is a pattern across jobs over time
+${t_test}    cluster:etcd:server:slow:apply:test:count sum(increase(etcd_server_slow_apply_total[${d_test}]))
+
 ${t_all}     cluster:etcd:read:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope)
 ${t_install} cluster:etcd:read:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope)
 ${t_test}    cluster:etcd:read:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope)
@@ -483,10 +655,6 @@ ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
 ${t_test}    job:duration:test:seconds vector(${s_test})
 
-${t_all}     cluster:promtail:failed_targets   sum by (pod) (promtail_targets_failed_total{reason!="exists"})
-${t_all}     cluster:promtail:dropped_entries  sum by (pod) (promtail_dropped_entries_total)
-${t_all}     cluster:promtail:request:duration sum by (status_code) (rate(promtail_request_duration_seconds_count[${d_all}]))
-
 ${t_all}     cluster:rest:client:requests:latency:total:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_all}:30s])) by (le,type)))
 ${t_install} cluster:rest:client:requests:latency:install:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_install}:30s])) by (le,type)))
 ${t_test}    cluster:rest:client:requests:latency:test:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_test}:30s])) by (le,type)))
@@ -511,6 +679,8 @@ set -f
 echo > /tmp/queries_resolved
 while IFS= read -r i; do
   if [[ -z "${i}" ]]; then continue; fi
+  # Skip comment lines
+  if [[ "${i}" =~ ^[[:space:]]*# ]]; then continue; fi
   # Try to convert the line of the file into a query, performing bash substitution AND catch undefined variables
   # The heredoc is necessary because bash will perform quote evaluation on labels in queries (pod="x" becomes pod=x)
   if ! q=$( eval $'cat <<END\n'$i$'\nEND\n' 2>/dev/null ); then
@@ -542,6 +712,8 @@ SCRIPT
 cat <<'SCRIPT'
 while IFS= read -r q; do
   if [[ -z "${q}" ]]; then continue; fi
+  # Skip comment lines
+  if [[ "${q}" =~ ^[[:space:]]*# ]]; then continue; fi
   # part up the line '<unix_timestamp_query_time> <name> <query>'
   timestamp=${q%% *}
   q=${q#* }
@@ -568,25 +740,106 @@ queue ${ARTIFACT_DIR}/metrics/job_metrics.json oc --insecure-skip-tls-verify rsh
 
 wait
 
-# C2S/SC2S proxy can not access internet
-if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
-  source "${SHARED_DIR}/unset-proxy.sh"
-fi
-# This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
-
 mkdir -p ${ARTIFACT_DIR}/junit/
-<${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+
+if openshift-tests e2e-analysis --help &>/dev/null; then
+    INSTALL_EXIT_CODE=0
+    if [[ -f "${SHARED_DIR}/install-status.txt" ]]; then
+        INSTALL_EXIT_CODE=$(tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}')
+    fi
+    if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "Post e2e-analysis check for the cluster"
+        if [[ -f "${SHARED_DIR}/install-duration.log" ]]; then
+            echo "Found install-duration.log, it will be used for collecting install durations"
+            cat "${SHARED_DIR}/install-duration.log"
+        fi
+        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    else
+        echo "Install failed, skipping post e2e-analysis check"
+    fi
+else
+    # C2S/SC2S proxy can not access internet
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+      source "${SHARED_DIR}/unset-proxy.sh"
+    fi
+    # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+    if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+    <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+fi
 
 # This is an experimental wiring of autogenerated failure detection.
 echo "Detect known failures from symptoms (experimental) ..."
-curl -f https://gist.githubusercontent.com/smarterclayton/03b50c8f9b6351b2d9903d7fb35b342f/raw/symptom.sh 2>/dev/null | bash -s ${ARTIFACT_DIR} > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
+# curl -f https://gist.githubusercontent.com/liangxia/1188ce4d25f42138694e32ac8ee9a373/raw/994d3bedeb7cb4cfc679b1e27e1a659a3d845d61/symptom.sh 2>/dev/null | bash -s ${ARTIFACT_DIR} > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
 
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+function xmlescape() {
+  echo -n "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+}
+
+pushd "${ARTIFACT_DIR}" || return
+
+tests=$( mktemp -t result-XXXX )
+input=$( mktemp -t search-XXXX )
+
+cat <<EOF > ${input}
+==Undiagnosed panic detected in pod=pods/*=Observed a panic
+==Undiagnosed panic detected in journal=nodes/*/journal*=Observed a panic
+=segfault=Bug 1812261: iptables is segfaulting=nodes/*/journal*=kernel: .+: segfault .+ libnftnl
+segfault==Node process segfaulted=nodes/*/journal*=kernel: .+: segfault
+==Infrastructure - quota exceeded or hit rate limit=pods/*=Throttling: Rate exceeded|The maximum number of [A-Za-z ]* has been reached|Quota .* exceeded|LimitExceeded.*exceed quota
+EOF
+
+searches=0
+failures=0
+declare -A covered
+while IFS= read -r line; do
+    searches=$((searches+1))
+    id=$( echo -n "${line}" | cut -f 1 -d = )
+    covers=$( echo -n "${line}" | cut -f 2 -d = )
+    if [[ -n "${id}" && -n "${covered[${id}]-}" ]]; then
+      continue
+    fi
+
+    prefix=$( echo -n "${line}" | cut -f 3 -d = )
+    files=$( echo -n "${line}" | cut -f 4 -d = )
+    search=$( echo -n "${line}" | cut -f 5- -d = )
+
+    out=$( zgrep -E "${search}" ${files} || true ) # ignore failures but log them to stderr
+    if [[ -z "${out}" ]]; then
+      echo "<testcase name=\"$( xmlescape "${prefix}" )\"></testcase>" >> "${tests}"
+      continue
+    fi
+    
+    # sometimes infrastrue issue got recovered during cluster reconciling, does not result in a cricital issue, then skip it.
+    if [[ "$prefix" == "Infrastructure - quota exceeded or hit rate limit" ]]; then
+      INSTALL_EXIT_CODE=0
+      INSTALL_STATUS_FILE="${SHARED_DIR}/install-status.txt"
+      [[ -f "${INSTALL_STATUS_FILE}" ]] && INSTALL_EXIT_CODE=$(tail -n1 "${INSTALL_STATUS_FILE}" | awk '{print $1}') || true
+      if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "<testcase name=\"$( xmlescape "${prefix}" )\"><system-out>install succeed, skipping: $( xmlescape "${out}" )</system-out></testcase>" >> "${tests}"
+        continue
+      fi
+    fi
+
+    echo Detected: "${prefix}" 1>&2
+
+    failures=$((failures+1))
+    if [[ -n "${covers}" ]]; then
+      covered[${covers}]="1"
+    fi
+    echo "<testcase name=\"$( xmlescape "${prefix}" )\"><failure>$( xmlescape "${out}" )</failure></testcase>" >> "${tests}"
+done < "${input}"
+
+cat <<EOF > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
+<testsuite name="Symptom Detection" tests="${searches}" errors="0" failures="${failures}" skipped="0" time="0" package="symptom">
+$( cat ${tests} )
+</testsuite>
+EOF
+
+popd || return
 
 # Create custom-link-tools.html from custom-links.txt
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"

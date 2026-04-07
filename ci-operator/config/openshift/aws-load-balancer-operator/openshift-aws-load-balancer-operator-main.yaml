@@ -1,21 +1,28 @@
 base_images:
-  base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.9
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: aws-load-balancer-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: aws-load-balancer-operator
 operator:
   bundles:
   - as: aws-load-balancer-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  - as: aws-load-balancer-operator-bundle-index
     base_index: operator-index
     dockerfile_path: bundle.Dockerfile
   substitutions:
@@ -24,12 +31,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -50,17 +57,30 @@ tests:
     make test
   container:
     from: src
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+    cluster_profile: openshift-org-aws
     env:
-      OO_CHANNEL: stable-v1
+      OO_APPLY_RESOURCES: "false"
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
-      OO_PACKAGE: aws-load-balancer-operator
-      OO_TARGET_NAMESPACES: '!all'
+      ZONES_COUNT: "2"
     test:
+    - as: install
+      cli: latest
+      commands: |
+        env
+        oc create ns aws-load-balancer-operator
+        operator-sdk run bundle -n aws-load-balancer-operator --timeout=10m --security-context-config restricted --install-mode AllNamespaces "$OO_BUNDLE"
+        oc -n aws-load-balancer-operator wait --for condition=Available deployment/aws-load-balancer-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: aws-load-balancer-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make test-e2e
@@ -70,12 +90,16 @@ tests:
           cpu: 100m
     workflow: aws-load-balancer-install
 - as: e2e-aws-rosa-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-qe
     dependencies:
-      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+      OO_INDEX: ci-index-aws-load-balancer-operator-bundle-index
     env:
+      CHANNEL_GROUP: stable
+      EVAL_CONFIG_ENVVARS: "yes"
       OO_CHANNEL: stable-v1
+      OO_CONFIG_ENVVARS: ROLEARN=$(cat ${SHARED_DIR}/operator-role-arn)
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
       OO_PACKAGE: aws-load-balancer-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -86,12 +110,43 @@ tests:
         export ALBO_E2E_PLATFORM=ROSA
         export ALBO_E2E_WAFV2_WEBACL_ARN=$(cat ${SHARED_DIR}/wafv2-webacl)
         export ALBO_E2E_WAF_WEBACL_ID=$(cat ${SHARED_DIR}/waf-webacl | head -1)
+        export ALBO_E2E_CONTROLLER_ROLE_ARN=$(cat ${SHARED_DIR}/controller-role-arn)
         make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: aws-load-balancer-install-rosa
+- as: e2e-aws-proxy-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      OO_APPLY_RESOURCES: "false"
+      OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      ZONES_COUNT: "2"
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create ns aws-load-balancer-operator
+        operator-sdk run bundle -n aws-load-balancer-operator --timeout=10m --security-context-config restricted --install-mode AllNamespaces "$OO_BUNDLE"
+        oc -n aws-load-balancer-operator wait --for condition=Available deployment/aws-load-balancer-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: aws-load-balancer-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aws-load-balancer-install-proxy
 zz_generated_metadata:
   branch: main
   org: openshift

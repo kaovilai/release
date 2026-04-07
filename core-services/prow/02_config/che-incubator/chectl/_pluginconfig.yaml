@@ -27,7 +27,6 @@ plugins:
     plugins:
     - assign
     - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
@@ -50,3 +49,8 @@ plugins:
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - che-incubator/chectl
+  trusted_apps:
+  - openshift-merge-bot

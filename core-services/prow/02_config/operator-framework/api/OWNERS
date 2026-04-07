@@ -5,23 +5,21 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- awgreene
-- benluddy
-- dinhxuanvu
+- camilamacedo86
 - grokspawn
 - joelanford
 - kevinrizza
 - perdasilva
+- tmshort
 options: {}
 reviewers:
 - anik120
 - ankitathomas
-- awgreene
-- benluddy
-- dinhxuanvu
-- gallettilance
+- camilamacedo86
+- fgiudici
 - grokspawn
 - joelanford
 - kevinrizza
 - oceanc80
 - perdasilva
+- tmshort

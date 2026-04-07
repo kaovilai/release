@@ -1,34 +1,36 @@
 base_images:
   os:
-    name: centos
-    namespace: openshift
-    tag: "7"
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: unset GOFLAGS && make build COMPILE_TARGET="./build/_output/bin/cloud-resource-operator"
   GO111MODULE=on
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
-  to: cloud-resource-operator
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
+    to: cloud-resource-operator
 promotion:
-  name: cloud-resource-operator
-  namespace: integr8ly
+  to:
+  - name: cloud-resource-operator
+    namespace: integr8ly
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -52,10 +54,10 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    owner: rhoam
     product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
+    timeout: 1h30m0s
+    version: "4.19"
   steps:
     test:
     - as: test
@@ -90,6 +92,10 @@ tests:
     name: cloud-resource-operator-codecov-token
 - as: gosec
   commands: make gosec
+  container:
+    from: src
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/golangci-cache make test/lint
   container:
     from: src
 zz_generated_metadata:

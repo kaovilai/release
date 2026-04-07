@@ -1,43 +1,36 @@
 base_images:
-  ocp_builder_rhel-8-base-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.14
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/images
 images:
-- context_dir: base
-  dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_builder_rhel-8-base-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.14
-  to: base
-- context_dir: egress/router
-  from: base
-  to: egress-router
-- context_dir: egress/http-proxy
-  from: base
-  to: egress-http-proxy
-- context_dir: egress/dns-proxy
-  from: base
-  to: egress-dns-proxy
-- context_dir: ipfailover/keepalived
-  from: base
-  to: keepalived-ipfailover
+  items:
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel
+    to: base
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel9
+    to: base-rhel9
+  - context_dir: ipfailover/keepalived
+    to: keepalived-ipfailover
 promotion:
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - excluded_images:
+    - base-rhel9
+    name: 4.22-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -47,12 +40,28 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
+- as: unit
+  commands: go test -race ./...
+  container:
+    from: src
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift-priv

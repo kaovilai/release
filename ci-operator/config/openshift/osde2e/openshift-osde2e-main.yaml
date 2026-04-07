@@ -1,8 +1,4 @@
 base_images:
-  azure:
-    name: ci-base
-    namespace: azure
-    tag: latest
   base:
     name: ubi
     namespace: ocp
@@ -12,10 +8,7 @@ base_images:
     namespace: ci
     tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  from_repository: true
 resources:
   '*':
     requests:
@@ -31,46 +24,36 @@ tests:
     make check
   container:
     from: src
-- as: rosa-pr-check
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|(.*\.md)|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- always_run: false
+  as: hypershift-pr-check
   commands: |
-    export GOFLAGS=""
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,pr-check"
-    export ROSA_ENV="stage"
-    export ROSA_STS="true"
-    export MUST_GATHER="false"
-    export CHANNEL="candidate"
-    export INSTALL_LATEST_XY="4.12"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
+    # Check if there are changes in pkg/ or cmd/ directories
+    if ! (git diff --name-only ${PULL_BASE_SHA} $(git merge-base FETCH_HEAD main) | grep -qE '^(pkg/|cmd/)'); then
+    echo "No changes detected in pkg/ or cmd/ directories. Skipping test." && exit 0; fi
 
-    go mod tidy
-    make build
-
-    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    from: src
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
-  skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
-- as: hypershift-pr-check
-  commands: |
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="hypershift"
-    export CHANNEL="candidate"
-    export INSTALL_LATEST_XY="4.12"
-    export MUST_GATHER="false"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
+    export CHANNEL="stable"
+    export SHARED_DIR="tmp/"
+    export LOG_BUCKET="osde2e-logs"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
 
     go mod tidy
     make build
+    echo "Provisioning and running e2e commands"
+    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --skip-destroy-cluster --skip-must-gather
 
-    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+    echo "Copying cluster ID for krknai commands."
+    if [[ ! -f "${SHARED_DIR}/cluster-id" ]];
+    then
+        echo "'cluster-id' not found in shared dir. Cluster may not have been provisioned."
+        exit 1
+    fi
+    echo "Running krknai commands"
+    DRY_RUN=true out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
+    echo "Finished osde2e pr checks on ROSA hypershift."
   container:
     from: src
   secrets:
@@ -78,276 +61,61 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-hypershift-byovpc
-    name: osde2e-hypershift-byovpc
-  skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
-- as: aro-ovn-e2e-default
-  cron: 0 0 9 * * *
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/destroy-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/create-aro-cluster-ovn.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: conformance-tests-pre-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: upgrade-latest-y
-      commands: |
-        ./ci/upgrade-aro-cluster.sh y
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: conformance-tests-post-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: aro-e2e-default
-  cron: 0 0 3 * *
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/destroy-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/create-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: conformance-tests-pre-upgrade
-      commands: |
-        export REPORT_DIR="$ARTIFACT_DIR"
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: upgrade-latest-y
-      commands: |
-        ./ci/upgrade-aro-cluster.sh y
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: conformance-tests-post-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: aro-nightly-cleanup
-  cron: '@midnight'
-  steps:
-    test:
-    - as: aro-cleanup
-      commands: |
-        export REPORT_DIR="$ARTIFACT_DIR"
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd osde2e
-        source ./ci/cleanup-aro-clusters.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+  - mount_path: /usr/local/osde2e-hypershift-credentials
+    name: osde2e-hypershift-credentials
 - as: rosa-stage-e2e-byo-vpc-proxy-install
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
     export CLUSTER_EXPIRY_IN_MINUTES="480"
-    export HIBERNATE_AFTER_USE="false"
     export ROSA_ENV="stage"
     export ROSA_STS="true"
     export USE_EXISTING_CLUSTER="false"
     export USE_PROXY_FOR_INSTALL="true"
     export USE_LATEST_VERSION_FOR_INSTALL="true"
     export CHANNEL="candidate"
-    export CONFIGS="rosa,e2e-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-rosa-stage"
+    export CONFIGS="rosa,rosa-e2e-suite"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-dev"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     clone: true
     from: osde2e
-  cron: 0 19 * * 0,2,4
+  cron: 0 19 14,28 * *
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-dev
+    name: osde2e-dev
   - mount_path: /usr/local/osde2e-static-byo-vpc
     name: osde2e-static-byo-vpc
 - as: rosa-stage-e2e-byo-vpc-proxy-postinstall
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
     export CLUSTER_EXPIRY_IN_MINUTES="480"
-    export HIBERNATE_AFTER_USE="false"
     export ROSA_ENV="stage"
     export ROSA_STS="true"
     export USE_EXISTING_CLUSTER="false"
     export USE_LATEST_VERSION_FOR_INSTALL="true"
     export CHANNEL="candidate"
     export CONFIGS="rosa,proxy-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-rosa-stage"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-dev"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     clone: true
     from: osde2e
-  cron: 0 5 * * 1
+  cron: 0 19 15,29 * *
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-dev
+    name: osde2e-dev
   - mount_path: /usr/local/osde2e-static-byo-vpc
     name: osde2e-static-byo-vpc
-- as: aws-stage-e2e-upgrade-to-latest
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="aws,stage,e2e-suite,upgrade-to-latest"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-- as: hypershift-stage-e2e-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="hypershift"
-    export CHANNEL="candidate"
-    export INSTALL_LATEST_XY="4.12"
-    export MUST_GATHER="false"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-hypershift-byovpc
-    name: osde2e-hypershift-byovpc
-- as: rosa-stage-e2e-sts
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,e2e-suite"
-    export ROSA_ENV="stage"
-    export ROSA_STS="true"
-    export CHANNEL="candidate"
-    export INSTALL_LATEST_XY="4.12"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
 - as: aws-stage-informing-default
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -360,28 +128,225 @@ tests:
   container:
     clone: true
     from: osde2e
-  cron: 0 */12 * * 0-5
+  cron: 0 12 * * 1
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: aws-prod-cleanup
+- as: stage-clusters-cleanup
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="stage"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 0 * * 2
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: prod-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
   container:
     clone: true
     from: osde2e
-  cron: 45 * * * *
+  cron: 45 0 * * 2
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-z-minus-1-to-latest-default-z
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_Z_FROM_DELTA="-1"
+    export UPGRADE_TO_LATEST_Z="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 1
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-y-minus-1-to-latest-default-y
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_Y_FROM_DELTA="-1"
+    export UPGRADE_TO_LATEST_Y="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 2
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-y-to-latest-y-plus-1
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export UPGRADE_TO_LATEST_Y="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 3
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-y-plus-1-to-latest-y
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export LATEST_Y_RELEASE_AFTER_PROD_DEFAULT="true"
+    export UPGRADE_TO_LATEST_Y="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 4
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: cleanup-tekton-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-tekton-copy,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-tekton-copy
+    name: osde2e-tekton-copy
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: cleanup-selfservice-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-selfservice-copy,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-selfservice-copy
+    name: osde2e-selfservice-copy
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: cleanup-dev-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-dev
+    name: osde2e-dev
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: cleanup-hypershift-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-hypershift-credentials
+    name: osde2e-hypershift-credentials
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: cleanup-trt-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-trt-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-trt-credentials
+    name: osde2e-trt-credentials
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+- as: cleanup-informing-aws
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-informing,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-informing
+    name: osde2e-informing
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: cleanup-rosa-nightly
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/rosa-e2e-prow-ci-01-osde2e"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 1 * * 5
+  secrets:
+  - mount_path: /usr/local/rosa-e2e-prow-ci-01-osde2e
+    name: rosa-e2e-prow-ci-01-osde2e
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -7,12 +7,14 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.build
 images:
-- dockerfile_path: Dockerfile.okd
-  from: base
-  to: metering-presto
+  items:
+  - dockerfile_path: Dockerfile.okd
+    from: base
+    to: metering-presto
 promotion:
-  name: "4.5"
-  namespace: ocp
+  to:
+  - name: "4.5"
+    namespace: ocp
 releases:
   initial:
     integration:

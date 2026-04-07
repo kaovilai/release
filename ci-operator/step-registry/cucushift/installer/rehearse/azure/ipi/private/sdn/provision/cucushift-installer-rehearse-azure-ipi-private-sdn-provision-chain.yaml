@@ -8,8 +8,11 @@ chain:
   - chain: ipi-conf-azure
   - ref: ipi-conf-azure-provisionednetwork
   - ref: sdn-conf
+  - chain: azure-provision-service-principal-minimal-permission
   - chain: ipi-install
   - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-private
   env:
   - name: PUBLISH
     default:  "Internal"

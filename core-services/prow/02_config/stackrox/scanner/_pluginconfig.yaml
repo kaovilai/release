@@ -37,3 +37,5 @@ triggers:
   - stackrox/scanner
   trusted_apps:
   - dependabot
+  - red-hat-konflux
+  - openshift-merge-bot

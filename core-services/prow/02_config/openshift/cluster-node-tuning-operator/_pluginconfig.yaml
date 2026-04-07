@@ -7,7 +7,7 @@ label:
   restricted_labels:
     openshift/cluster-node-tuning-operator:
     - allowed_teams:
-      - openshift-patch-managers
+      - openshift-staff-engineers
       allowed_users:
       - jmencak
       - kpouget
@@ -17,9 +17,12 @@ label:
     - allowed_users:
       - liqcui
       - rpattath
+      - shyadav10
       - shajmakh
       - kononovn
       - mrniranjan
+      - rshemtov13
+      - SargunNarula
       label: cherry-pick-approved
 lgtm:
 - repos:

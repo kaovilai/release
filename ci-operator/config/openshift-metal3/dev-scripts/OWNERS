@@ -11,9 +11,10 @@ approvers:
 - cybertron
 - derekhiggins
 - dtantsur
-- flaper87
-- hardys
+- elfosardo
+- mkowalski
 - sadasu
+- tdomnesc
 - zaneb
 options: {}
 reviewers:
@@ -23,7 +24,8 @@ reviewers:
 - cybertron
 - derekhiggins
 - dtantsur
-- flaper87
-- hardys
+- elfosardo
+- mkowalski
 - sadasu
+- tdomnesc
 - zaneb

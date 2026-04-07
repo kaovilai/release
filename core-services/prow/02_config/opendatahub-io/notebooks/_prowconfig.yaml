@@ -1,6 +1,14 @@
+branch-protection:
+  orgs:
+    opendatahub-io:
+      repos:
+        notebooks:
+          branches:
+            main:
+              protect: false
 tide:
   merge_method:
-    opendatahub-io/notebooks: squash
+    opendatahub-io/notebooks: merge
   queries:
   - labels:
     - approved

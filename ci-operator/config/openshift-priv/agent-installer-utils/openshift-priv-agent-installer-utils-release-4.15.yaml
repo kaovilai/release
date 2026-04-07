@@ -1,26 +1,19 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/agent-installer-utils
 images:
-- dockerfile_path: images/Dockerfile.ocp
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: agent-installer-utils
+  items:
+  - dockerfile_path: images/Dockerfile.ocp
+    to: agent-installer-utils
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -40,6 +33,44 @@ resources:
       memory: 200Mi
 test_binary_build_commands: dnf install -y nmstate-devel
 tests:
+- as: e2e-agent-bad-dns
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_TEST_CASES=bad_dns
+    workflow: agent-e2e-generic
+- as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+- always_run: false
+  as: e2e-agent-sno-ipv6
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+- always_run: false
+  as: e2e-agent-ha-dualstack
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+    workflow: agent-e2e-generic
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
@@ -47,6 +78,11 @@ tests:
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: unit
+  commands: IS_CONTAINER=TRUE ./hack/go-test.sh ./...
   container:
     from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)

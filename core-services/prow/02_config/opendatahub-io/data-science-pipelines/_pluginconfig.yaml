@@ -2,7 +2,7 @@ approve:
 - commandHelpLink: ""
   repos:
   - opendatahub-io/data-science-pipelines
-  require_self_approval: false
+  require_self_approval: true
 external_plugins:
   opendatahub-io/data-science-pipelines:
   - endpoint: http://refresh
@@ -42,7 +42,6 @@ plugins:
     plugins:
     - assign
     - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
@@ -66,3 +65,8 @@ plugins:
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - opendatahub-io/data-science-pipelines
+  trusted_apps:
+  - openshift-merge-bot

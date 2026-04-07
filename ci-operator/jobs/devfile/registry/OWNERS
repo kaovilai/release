@@ -6,11 +6,14 @@
 
 approvers:
 - elsony
+- jdubrick
 - johnmcollier
+- michael-valdron
+- thepetk
 options: {}
 reviewers:
 - elsony
-- ibuziuk
-- jerolimov
-- kadel
-- rohitkrai03
+- jdubrick
+- johnmcollier
+- michael-valdron
+- thepetk

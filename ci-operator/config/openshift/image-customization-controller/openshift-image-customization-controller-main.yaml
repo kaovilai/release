@@ -1,37 +1,26 @@
 base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: machine-image-customization-controller
+  items:
+  - to: machine-image-customization-controller
 promotion:
-  name: "4.14"
-  namespace: ocp
+  to:
+  - name: "4.22"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -50,20 +39,47 @@ tests:
   commands: make lint
   container:
     from: src
-- as: e2e-metal-ipi-sdn-bm
-  cluster: build05
+- as: vendor
+  commands: make vendor && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: (go\.(mod|sum)$)|(^vendor/)
+- as: e2e-metal-ipi-bm
+  capabilities:
+  - intranet
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: openshift

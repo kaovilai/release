@@ -7,20 +7,25 @@
 approvers:
 - abhat
 - danwinship
-- dcbw
-- dougbtv
-- fepan
 - jacobtanenbaum
 - jcaamano
 - knobunc
-- trozet
+- kyrtapz
+- pliurh
+- tssurya
 options: {}
 reviewers:
-- abhat
+- arghosh93
+- arkadeepsen
+- bpickard22
 - danwinship
-- dcbw
-- dougbtv
-- jacobtanenbaum
 - jcaamano
-- trozet
+- kyrtapz
+- martinkennelly
+- marty-power
+- mattedallo
+- miheer
+- pliurh
+- pperiyasamy
+- taanyas
 - tssurya

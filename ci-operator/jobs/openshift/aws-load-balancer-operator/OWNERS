@@ -6,10 +6,18 @@
 
 approvers:
 - alebedev87
+- candita
+- davidesalerno
+- gcs278
+- grzpiotrowski
 - miciah
-- thejasn
+- rfredette
+- thealisyed
 options: {}
 reviewers:
 - alebedev87
-- miciah
-- thejasn
+- davidesalerno
+- gcs278
+- grzpiotrowski
+- rfredette
+- thealisyed

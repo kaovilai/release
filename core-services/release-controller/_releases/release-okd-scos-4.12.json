@@ -1,10 +1,11 @@
 {
   "name": "4.12.0-0.okd-scos",
+  "endOfLife": true,
   "to": "release-scos",
   "mirrorPrefix": "4.12-okd-scos",
   "expires": "72h",
   "maxUnreadyReleases": 1,
-  "minCreationIntervalSeconds": 3600,
+  "minCreationIntervalSeconds": 2419200,
   "check": {},
   "publish": {
     "tag": {
@@ -13,20 +14,5 @@
       }
     }
   },
-  "verify": {
-    "aws": {
-      "maxRetries": 2,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-okd-scos-4.12-e2e-aws-ovn"
-      }
-    },
-    "aws-upgrade":{
-      "maxRetries": 2,
-      "optional": true,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-okd-scos-4.12-e2e-aws-ovn-upgrade"
-      },
-      "upgrade": true
-    }
-  }
+  "verify": {}
 }

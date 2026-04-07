@@ -8,14 +8,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-golang-1.12
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-api
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-api
 promotion:
-  name: cluster-api
-  namespace: ocp-future
+  to:
+  - name: cluster-api
+    namespace: ocp-future
 releases:
   initial:
     integration:

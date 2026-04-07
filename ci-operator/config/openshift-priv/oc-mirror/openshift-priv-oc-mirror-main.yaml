@@ -1,53 +1,33 @@
 base_images:
-  base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/oc-mirror
 images:
-- dockerfile_path: images/cli/Dockerfile.ci
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: oc-mirror
-- dockerfile_path: images/tests/Dockerfile.integration
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
-  optional: true
-  to: oc-mirror-integration
+  items:
+  - dockerfile_path: images/cli/Dockerfile.ci
+    to: oc-mirror
+  - dockerfile_path: images/cli/Dockerfile.test
+    to: oc-mirror-tests
 promotion:
-  excluded_images:
-  - oc-mirror-integration
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - excluded_images:
+    - oc-mirror-tests
+    name: 4.22-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -62,55 +42,55 @@ tests:
   commands: make sanity
   container:
     from: src
+  skip_if_only_changed: ^v1/
 - as: unit
-  commands: make test-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make test-unit
   container:
     from: src
-- as: e2e
-  commands: make test-e2e
+  skip_if_only_changed: ^v1/
+- as: v1-e2e
+  commands: |
+    pushd v1 || true
+    make test-e2e
   container:
     from: src
-- as: integration
-  optional: true
+- as: v1-sanity
+  commands: make -C v1 sanity
+  container:
+    from: src
+- as: v1-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make -C v1 test-unit
+  container:
+    from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint version
+    golangci-lint run --new-from-rev=HEAD~ --verbose --timeout=5m --config .golangci.v2.yaml
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: ^v1/
+- as: verify-deps
   steps:
-    post:
-    - as: test-integration-delete
-      commands: cd test/integration && make ci-delete
-      credentials:
-      - mount_path: /etc/ci/aws-creds
-        name: oc-mirror-ci-aws-creds
-        namespace: test-credentials
-      - mount_path: /etc/ci/pull-secret
-        name: oc-mirror-ci-pull-secret
-        namespace: test-credentials
-      from: oc-mirror-integration
-      grace_period: 30m0s
-      resources:
-        limits:
-          cpu: 500m
-          memory: 1Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 1h0m0s
+    env:
+      CHECK_MOD_LIST: "false"
     test:
-    - as: test-integration
-      commands: cd test/integration && make ci
-      credentials:
-      - mount_path: /etc/ci/aws-creds
-        name: oc-mirror-ci-aws-creds
-        namespace: test-credentials
-      - mount_path: /etc/ci/pull-secret
-        name: oc-mirror-ci-pull-secret
-        namespace: test-credentials
-      from: oc-mirror-integration
-      resources:
-        limits:
-          cpu: 500m
-          memory: 1Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: go-verify-deps
+- as: integration
+  commands: |
+    cd /artifacts && ./integration.test
+  container:
+    from: oc-mirror-tests
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^v1/)
 zz_generated_metadata:
   branch: main
   org: openshift-priv

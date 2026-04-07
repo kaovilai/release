@@ -1,30 +1,32 @@
 base_images:
-  openshift_release_rhel-8-release-golang-1.19-openshift-4.12:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.12
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build
 build_root:
   from_repository: true
   use_build_cache: true
 canonical_go_repository: github.com/openshift/windows-machine-config-operator
 images:
-- dockerfile_path: build/Dockerfile.ci
-  inputs:
-    openshift_release_rhel-8-release-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12
-  to: windows-machine-config-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.ci
+    to: windows-machine-config-operator-test
 operator:
   bundles:
-  - context_dir: .
+  - as: wmco-bundle
+    context_dir: .
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
-  name: 4.12-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      windows-machine-config-operator-bundle: wmco-bundle
+    name: 4.12-priv
+    namespace: ocp-private
 releases:
   latest:
     integration:
@@ -55,104 +57,182 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: build
-  commands: make build
-  container:
-    from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: aws-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+- as: security
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: aws
+    env:
+      PROJECT_NAME: windows-machine-config-operator
+    workflow: openshift-ci-security
+- always_run: false
+  as: aws-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: azure-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-azure
     env:
       WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
-    workflow: ipi-aws-ovn-hybrid
-- as: azure-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    test:
-    - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
-- as: azure-e2e-ccm-install
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    test:
-    - ref: windows-e2e-operator-test
-    workflow: openshift-e2e-azure-ccm-ovn-hybrid-install
-- as: gcp-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: gcp-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: gcp
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
       WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-gcp-ovn-hybrid
-- as: vsphere-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: vsphere-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-elastic
     test:
-    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: aws-e2e-upgrade
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: azure-e2e-upgrade
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: aws
-    env:
-      OO_CHANNEL: preview
-      OO_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
-      OO_PACKAGE: windows-machine-config-operator
-      OO_TARGET_NAMESPACES: '!install'
+    cluster_profile: openshift-org-azure
     test:
-    - as: e2e-aws-upgrade
+    - as: install
+      cli: latest
+      commands: |-
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+        # deploy og
+        oc create -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: windows-machine-config-operator
+          namespace: ${WMCO_NS}
+        spec:
+          targetNamespaces:
+            - ${WMCO_NS}
+        EOF
+
+        # install operator via subscription
+        oc create -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: windows-machine-config-operator
+          namespace: ${WMCO_NS}
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: windows-machine-config-operator
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is
+        # created by the subscription controller
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo "max retries hit"
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      from: cli
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
       cli: latest
       commands: |-
         #!/bin/bash
         set -euo pipefail
-        cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-        export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
-        export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
-        make run-ci-e2e-upgrade-test
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
-      - env: OPERATOR_IMAGE
-        name: windows-machine-config-operator-test
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
       from: windows-machine-config-operator-test
       resources:
         requests:
           cpu: 1000m
           memory: 400Mi
-    workflow: optional-operators-ci-aws-ovn-hybrid
-- as: platform-none-vsphere-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    - as: upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        operator-sdk cleanup --timeout 1m windows-machine-config-operator -n $WMCO_NS || {
+          echo "operator-sdk cleanup timed out"
+        }
+        operator-sdk run bundle --timeout=10m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: wmco-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
+  as: platform-none-vsphere-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: vsphere-platform-none
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
-- as: wicd-unit-vsphere
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: wicd-unit-vsphere
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-elastic
     post:
     - chain: upi-vsphere-windows-post
     pre:
     - ref: ipi-install-rbac
     - ref: ipi-conf
     - ref: ipi-conf-vsphere-check
-    - ref: upi-conf-vsphere
+    - ref: ipi-conf-vsphere-check-vcm
+    - ref: upi-conf-vsphere-vcm
+    - ref: upi-conf-vsphere-dns
     - chain: upi-vsphere-windows-pre
     test:
     - ref: windows-unit-wicd

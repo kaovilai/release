@@ -5,21 +5,23 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- bparees
 - deads2k
 - deepsm007
-- dennisperiquet
 - dgoodwin
 - neisw
+- petr-muller
+- smg247
+- sosiouxme
 - stbenjam
 - xueqzhan
 options: {}
 reviewers:
-- bparees
 - deads2k
 - deepsm007
-- dennisperiquet
 - dgoodwin
 - neisw
+- petr-muller
+- smg247
+- sosiouxme
 - stbenjam
 - xueqzhan

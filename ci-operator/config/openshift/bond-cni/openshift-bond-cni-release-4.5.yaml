@@ -7,14 +7,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-golang-1.12
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  to: network-interface-bond-cni
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: network-interface-bond-cni
 promotion:
-  name: "4.5"
-  namespace: ocp
+  to:
+  - name: "4.5"
+    namespace: ocp
 releases:
   initial:
     integration:

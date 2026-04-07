@@ -11,51 +11,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/jenkins
 images:
-- context_dir: "2"
-  dockerfile_path: Dockerfile.rhel8
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/2/.
-  to: jenkins
-- context_dir: slave-base
-  dockerfile_path: Dockerfile.rhel8
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/slave-base/.
-  to: jenkins-agent-base
-- context_dir: agent-maven
-  dockerfile_path: Dockerfile.rhel8
-  from: jenkins-agent-base
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-maven/.
-  to: jenkins-agent-maven
-- context_dir: agent-nodejs-12
-  dockerfile_path: Dockerfile.rhel8
-  from: jenkins-agent-base
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-12/.
-  to: jenkins-agent-nodejs
+  items:
+  - context_dir: "2"
+    dockerfile_path: Dockerfile.rhel8
+    from: base
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/jenkins/2/.
+    to: jenkins
+  - context_dir: slave-base
+    dockerfile_path: Dockerfile.rhel8
+    from: base
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/jenkins/slave-base/.
+    to: jenkins-agent-base
 promotion:
-  name: 4.13-priv
-  namespace: ocp-private
+  to:
+  - name: 4.13-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -87,22 +65,28 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: jenkins-sync-plugin-e2e
     workflow: ipi-aws
 - as: e2e-aws-jenkins-client-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: jenkins-client-plugin-tests
     workflow: ipi-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ocptools-jenkins
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv

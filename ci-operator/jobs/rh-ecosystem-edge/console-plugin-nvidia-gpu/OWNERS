@@ -7,15 +7,15 @@
 filters:
   .*:
     approvers:
-    - jelkosz
-    - jtomasek
-    - mareklibra
-    - rawagner
+    - empovit
+    - fabiendupont
+    - tomernewman
+    - yakovbeder
     reviewers:
-    - jelkosz
-    - jtomasek
-    - mareklibra
-    - rawagner
+    - empovit
+    - fabiendupont
+    - tomernewman
+    - yakovbeder
   ^Dockerfile.*:
     labels:
     - downstream-change-needed

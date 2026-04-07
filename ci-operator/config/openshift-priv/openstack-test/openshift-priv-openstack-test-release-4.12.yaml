@@ -1,31 +1,21 @@
-base_images:
-  origin_4.12_cli:
-    name: "4.12"
-    namespace: origin
-    tag: cli
 binary_build_commands: go build -o /bin/openstack-tests ./cmd/openshift-tests
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 canonical_go_repository: github.com/openshift/openstack-test
 images:
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/origin/4.12:cli AS cli
-    FROM bin
-    COPY --from=cli /usr/bin/oc /bin/oc
-  from: bin
-  inputs:
-    origin_4.12_cli:
-      as:
-      - registry.ci.openshift.org/origin/4.12:cli
-  to: openstack-tests
+  items:
+  - dockerfile_literal: FROM bin
+    from: bin
+    to: openstack-tests
 promotion:
-  additional_images:
-    openstack-tests: bin
-  name: 4.12-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      openstack-tests: bin
+    name: 4.12-priv
+    namespace: ocp-private
 releases:
   latest:
     integration:
@@ -48,24 +38,6 @@ tests:
   commands: make verify
   container:
     from: src
-- as: test
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      CONFIG_TYPE: minimal
-    test:
-    - ref: openstack-test-openstack
-    workflow: openshift-e2e-openstack-ipi
-- as: test-kuryr
-  steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-test-openstack
-    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

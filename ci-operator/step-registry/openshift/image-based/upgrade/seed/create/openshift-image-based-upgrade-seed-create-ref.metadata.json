@@ -1,0 +1,13 @@
+{
+	"path": "openshift/image-based/upgrade/seed/create/openshift-image-based-upgrade-seed-create-ref.yaml",
+	"owners": {
+		"approvers": [
+			"image-based",
+			"single-node"
+		],
+		"reviewers": [
+			"image-based",
+			"single-node"
+		]
+	}
+}

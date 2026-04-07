@@ -1,5 +1,9 @@
 #!/bin/bash
 
+################################################################################################
+# This file is no longer used.  It is being left behind temporarily while we migrate to python #
+################################################################################################
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -12,19 +16,25 @@ export HOME=/tmp
 if ! command -v aws &> /dev/null
 then
     echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
-    export PATH="${HOME}/.local/bin:${PATH}"
-    if command -v pip3 &> /dev/null
+    export PATH="${HOME}/.local/bin:${PATH}" 
+
+    if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
     then
+      easy_install --user 'pip<21'
+      pip install --user awscli
+    elif [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 3 ]
+    then
+      python -m ensurepip
+      if command -v pip3 &> /dev/null
+      then        
         pip3 install --user awscli
-    else
-        if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
-        then
-          easy_install --user 'pip<21'
-          pip install --user awscli
-        else
-          echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
-          exit 1
-        fi
+      elif command -v pip &> /dev/null
+      then
+        pip install --user awscli
+      fi
+    else    
+      echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
+      exit 1
     fi
 fi
 

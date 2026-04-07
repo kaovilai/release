@@ -3,8 +3,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/api
 promotion:
-  name: 4.13-priv
-  namespace: ocp-private
+  to:
+  - name: 4.13-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -50,7 +51,7 @@ tests:
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
-    git clone https://github.com/openshift/client-go --branch release-4.13 --single-branch $dir
+    git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
     rm -rf $dir/vendor/github.com/openshift/api/*
     cp -Rf * $dir/vendor/github.com/openshift/api/
     rm -rf $dir/vendor/github.com/openshift/api/vendor

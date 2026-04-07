@@ -11,6 +11,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
 if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   echo "Skipping rollback for the DHCP/PXE/GRUB2 configuration."
   exit 0
@@ -36,10 +41,10 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   CLUSTER_NAME="${1}"; shift
   MAC_ARRAY=("$@")
   echo "Removing the DHCP/PXE config..."
-  sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/dhcpd/root/etc/dnsmasq.conf
-  docker restart dhcpd
+  rm -f /opt/dnsmasq/hosts/{hostsdir,optsdir}/"${CLUSTER_NAME}"
+  kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
   echo "Removing the grub config..."
   for mac in "${MAC_ARRAY[@]}"; do
-    rm -f "/opt/tftpboot/grub.cfg-01-$(echo "$mac" | tr ':' '-')" || echo "no grub.cfg for $mac."
+    rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-$(echo "$mac" | tr ':' '-')" || echo "no grub.cfg for $mac."
   done
 EOF

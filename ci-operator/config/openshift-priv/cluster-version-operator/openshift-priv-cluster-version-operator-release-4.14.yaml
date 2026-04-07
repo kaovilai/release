@@ -2,32 +2,22 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
-  ocp_4.14_base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: v1.53.1
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_4.14_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: cluster-version-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-version-operator
 promotion:
-  disabled: true
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - name: 4.14-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -54,10 +44,11 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose --timeout=5m0s
+    golangci-lint run --verbose --timeout=5m1s
   container:
     clone: true
     from: golangci-lint
+  run_if_changed: \.go$
 - as: unit
   commands: go test ./...
   container:
@@ -66,12 +57,12 @@ tests:
 - as: e2e-agnostic-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: e2e-test
       commands: hack/test-integration.sh
@@ -84,16 +75,24 @@ tests:
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: e2e-agnostic-ovn-upgrade-out-of-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-azure
+- as: e2e-hypershift-conformance
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-conformance
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

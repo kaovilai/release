@@ -5,14 +5,17 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- chamalabey
 - clcollins
-- drewandersonnz
 - iamkirkbater
-- rogbas
+- samanthajayasinghe
+- smarthall
+- tkong-redhat
 options: {}
 reviewers:
-- alexvulaj
+- chamalabey
 - clcollins
-- drewandersonnz
 - iamkirkbater
-- rogbas
+- samanthajayasinghe
+- smarthall
+- tkong-redhat

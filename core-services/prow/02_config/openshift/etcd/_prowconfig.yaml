@@ -1,10 +1,27 @@
+branch-protection:
+  orgs:
+    openshift:
+      repos:
+        etcd:
+          branches:
+            main:
+              protect: true
 tide:
   queries:
   - includedBranches:
     - openshift-4.10
     - openshift-4.11
     - openshift-4.12
+    - openshift-4.13
+    - openshift-4.14
+    - openshift-4.15
+    - openshift-4.16
+    - openshift-4.17
+    - openshift-4.18
+    - openshift-4.19
     - openshift-4.2
+    - openshift-4.20
+    - openshift-4.21
     - openshift-4.3
     - openshift-4.4
     - openshift-4.5
@@ -12,15 +29,17 @@ tide:
     - openshift-4.7
     - openshift-4.8
     - openshift-4.9
+    - release-4.21
     labels:
     - approved
     - backport-risk-assessed
-    - bugzilla/valid-bug
-    - cherry-pick-approved
+    - jira/valid-bug
+    - jira/valid-reference
     - lgtm
+    - staff-eng-approved
+    - verified
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress
@@ -29,46 +48,16 @@ tide:
     repos:
     - openshift/etcd
   - includedBranches:
-    - openshift-4.12
+    - openshift-4.22
+    - release-4.22
     labels:
     - approved
-    - bugzilla/valid-bug
+    - backport-risk-assessed
+    - jira/valid-reference
     - lgtm
+    - verified
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
-    - do-not-merge/hold
-    - do-not-merge/invalid-owners-file
-    - do-not-merge/work-in-progress
-    - jira/invalid-bug
-    - keep-main-query-separate
-    - needs-rebase
-    repos:
-    - openshift/etcd
-  - includedBranches:
-    - openshift-4.13
-    labels:
-    - approved
-    - bugzilla/valid-bug
-    - lgtm
-    missingLabels:
-    - backports/unvalidated-commits
-    - bugzilla/invalid-bug
-    - do-not-merge/hold
-    - do-not-merge/invalid-owners-file
-    - do-not-merge/work-in-progress
-    - jira/invalid-bug
-    - needs-rebase
-    repos:
-    - openshift/etcd
-  - includedBranches:
-    - openshift-4.12
-    labels:
-    - approved
-    - lgtm
-    missingLabels:
-    - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress
@@ -85,7 +74,16 @@ tide:
     - openshift-4.11
     - openshift-4.12
     - openshift-4.13
+    - openshift-4.14
+    - openshift-4.15
+    - openshift-4.16
+    - openshift-4.17
+    - openshift-4.18
+    - openshift-4.19
     - openshift-4.2
+    - openshift-4.20
+    - openshift-4.21
+    - openshift-4.22
     - openshift-4.3
     - openshift-4.4
     - openshift-4.5
@@ -95,10 +93,10 @@ tide:
     - openshift-4.9
     labels:
     - approved
+    - jira/valid-reference
     - lgtm
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress

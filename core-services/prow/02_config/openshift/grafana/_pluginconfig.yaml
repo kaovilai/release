@@ -2,7 +2,7 @@ label:
   restricted_labels:
     openshift/grafana:
     - allowed_teams:
-      - openshift-patch-managers
+      - openshift-staff-engineers
       allowed_users:
       - PhilipGough
       - sthaha
@@ -14,6 +14,7 @@ label:
       - juzhao
       - lihongyan1
       - wzheng1
+      - Tai-RedHat
       label: cherry-pick-approved
 plugins:
   openshift/grafana:

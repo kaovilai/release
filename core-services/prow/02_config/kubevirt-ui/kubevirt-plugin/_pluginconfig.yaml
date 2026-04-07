@@ -33,12 +33,13 @@ plugins:
     plugins:
     - assign
     - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
     - goose
+    - help
     - hold
+    - jira
     - label
     - lgtm
     - lifecycle
@@ -54,3 +55,8 @@ plugins:
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - kubevirt-ui/kubevirt-plugin
+  trusted_apps:
+  - openshift-merge-bot

@@ -1,35 +1,32 @@
 base_images:
-  base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: gcp-pd-csi-driver
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: gcp-pd-csi-driver
 promotion:
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - name: 4.22-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -42,9 +39,10 @@ tests:
 - always_run: false
   as: test
   commands: |
-    make test-sanity
+    GOFLAGS="-mod=readonly" make test-sanity
   container:
     from: src
+  optional: true
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
@@ -53,10 +51,62 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
+- always_run: false
+  as: e2e-gcp-csi-c3
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- always_run: false
+  as: e2e-gcp-csi-n4
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: e2e-gcp-ovn-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-ovn
+- always_run: false
+  as: e2e-gcp-csi-extended
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[GKE-PD-CSI\]
+    workflow: openshift-e2e-gcp-csi-extended
+- always_run: false
+  as: e2e-gcp-csi-volumeattributesclass
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: e2e-gcp-csi-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity-persistent-disk
 - as: verify-deps
   steps:
     test:
     - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: gcp-pd-csi-driver
+    workflow: openshift-ci-security
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: master
   org: openshift-priv

@@ -6,24 +6,17 @@
 
 approvers:
 - aneeshkp
-- dcbw
 - dougbtv
-- fepan
 - josephdrichard
-- nishant-parekh
-- pliurh
-- s1061123
+- jzding
+- nocturnalastro
 - schseba
-- zshi-redhat
+- vitus133
 options: {}
 reviewers:
 - aneeshkp
-- dcbw
-- dougbtv
-- fepan
 - josephdrichard
-- nishant-parekh
-- pliurh
-- s1061123
+- jzding
+- nocturnalastro
 - schseba
-- zshi-redhat
+- vitus133

@@ -12,8 +12,10 @@ approvers:
 - radekmanak
 options: {}
 reviewers:
+- chrischdi
 - damdo
-- elmiko
-- joelspeed
-- odvarkadaniel
+- mdbooth
+- nrb
+- racheljpg
 - radekmanak
+- theobarberbany

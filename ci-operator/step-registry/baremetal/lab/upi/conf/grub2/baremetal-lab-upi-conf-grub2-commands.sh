@@ -46,7 +46,19 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   mac_postfix=${mac//:/-}
   kargs="$(join_by_semicolon "$ipi_disabled_ifaces" "ip=" ":off")"
   kargs="$kargs$(join_by_semicolon "$console_kargs" "console=" "")"
-  cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
+  
+  if [[ "$USE_CONSOLE_HOOK" == "true" ]]; then
+    if [[ "$BOOTSTRAP_IN_PLACE" == "true" ]]; then
+      kargs="${kargs} ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/bootstrap.ign"
+    else
+      kargs="${kargs} ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign"
+    fi
+  fi
+
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ] && [ "${SCALE_UPI}" == "true" ]; then
+    echo "No grub configuration needed for ${name} as it will be scaled with BMO"
+  elif [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ] && [ "${SCALE_UPI}" == "false" ]; then
+    cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
 set timeout=5
 set default=0
 insmod efi_gop
@@ -55,11 +67,26 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch}_2 debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}_2.img ignition.firstboot ignition.platform.id=metal panic=30
+    initrd /${CLUSTER_NAME}/initramfs_${arch}_2.img
+}
+EOF
+  else
+    cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
+set timeout=5
+set default=0
+insmod efi_gop
+insmod efi_uga
+load_video
+menuentry 'Install ($flavor)' {
+    set gfx_payload=keep
+    insmod gzio
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.firstboot ignition.platform.id=metal panic=30
     initrd /${CLUSTER_NAME}/initramfs_${arch}.img
 }
 EOF
+  fi
 done
 
 echo "Uploading the GRUB2 config to the auxiliary host..."
-scp "${SSHOPTS[@]}" "${GRUB_DIR}"/grub.cfg-01-* "root@${AUX_HOST}:/opt/tftpboot"
+scp "${SSHOPTS[@]}" "${GRUB_DIR}"/grub.cfg-01-* "root@${AUX_HOST}:/opt/dnsmasq/tftpboot"

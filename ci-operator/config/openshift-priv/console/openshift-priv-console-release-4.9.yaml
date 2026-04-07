@@ -7,14 +7,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: console
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: console
 promotion:
-  additional_images:
-    console-tests: src
-  name: 4.9-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      console-tests: src
+    name: 4.9-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -97,7 +99,7 @@ tests:
 - as: ceph-storage-plugin
   run_if_changed: frontend/packages/ceph-storage-plugin
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m4.2xlarge
       ZONES_COUNT: "1"

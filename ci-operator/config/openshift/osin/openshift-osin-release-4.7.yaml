@@ -8,10 +8,11 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-8-release-golang-1.15-openshift-4.7
 promotion:
-  name: "4.7"
-  namespace: ocp
+  to:
+  - name: "4.7"
+    namespace: ocp
 resources:
   '*':
     requests:

@@ -5,13 +5,48 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- gsleeman
+- abyrne55
+- annelson-rh
+- bergmannf
+- bmeng
+- bng0y
+- boranx
+- casey-williams-rh
+- cjnovak98
+- clcollins
+- dem4gus
+- digilink
+- dustman9000
+- fsferraz-rh
+- iamkirkbater
+- ironcladlou
 - jaybeeunix
+- jonahbrawley
 - karthikperu7
+- katherinelc321
+- mrsantamaria
+- npecka
+- petercsre
+- pheckenlwork
+- pshickeydev
+- rafael-azevedo
+- ravitri
+- rogbas
+- rojasreinold
+- sam-nguyen7
+- smarthall
+- theautoroboto
+- typeid
 - wshearn
 options: {}
 reviewers:
-- c-e-brumm
-- gsleeman
+- afreiberger
+- aleccohan
+- boranx
+- casey-williams-rh
+- dem4gus
 - jaybeeunix
+- npecka
+- pshickeydev
+- sam-nguyen7
 - wshearn

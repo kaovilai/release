@@ -6,12 +6,12 @@
 
 approvers:
 - elmiko
-- enxebre
-- joelspeed
+- jkyros
+- joelsmith
+- maxcao13
 options: {}
 reviewers:
-- damdo
 - elmiko
-- joelspeed
-- odvarkadaniel
-- radekmanak
+- jkyros
+- joelsmith
+- maxcao13

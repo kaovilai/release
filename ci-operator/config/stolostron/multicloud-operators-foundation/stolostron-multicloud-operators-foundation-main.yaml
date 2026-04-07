@@ -2,38 +2,38 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  stolostron_builder_go1.19-linux:
+    tag: "9"
+  stolostron_builder_go1.24-linux:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.24-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.19-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
-  to: multicloud-manager
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
+    from: base
+    to: multicloud-manager
 promotion:
-  disabled: true
-  name: "2.3"
-  namespace: stolostron
+  to:
+  - disabled: true
+    name: "2.17"
+    namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -49,39 +49,51 @@ tests:
     true
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
     make test --warn-undefined-variables
   container:
     from: test-bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: integration
   commands: make test-integration
   container:
     from: test-bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.10"
+  capabilities:
+  - arm64
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: multicloud-manager
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 6h
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: ocp410\|ocp411
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: test
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
         OCM_VERSION=main
         REGISTRATION_OPERATOR_BRANCH=$OCM_VERSION
@@ -91,7 +103,9 @@ tests:
         PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_VERSION
         export KUBECTL IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE REGISTRATION_OPERATOR_BRANCH
         export KUBECTL
-        make test-e2e
+        set -o pipefail
+        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
       dependencies:
       - env: FOUNDATION_IMAGE_NAME
         name: multicloud-manager
@@ -99,41 +113,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
-- as: sonar-pre-submit
-  steps:
-    test:
-    - as: test
-      commands: |
-        export SONAR_GO_TEST_ARGS="./..."
-        export SELF="make -f /opt/build-harness/Makefile.prow"
-        make -f /opt/build-harness/Makefile.prow sonar/go/prow
-      credentials:
-      - mount_path: /etc/sonarcloud/
-        name: acm-sonarcloud-token
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-- as: sonar-post-submit
-  postsubmit: true
-  steps:
-    test:
-    - as: test
-      commands: |
-        export SONAR_GO_TEST_ARGS="./..."
-        export SELF="make -f /opt/build-harness/Makefile.prow"
-        make -f /opt/build-harness/Makefile.prow sonar/go/prow
-      credentials:
-      - mount_path: /etc/sonarcloud/
-        name: acm-sonarcloud-token
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
+    workflow: ocm-e2e-clusterpool
 - as: pr-image-mirror
+  capabilities:
+  - arm64
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicloud-manager
@@ -142,6 +125,8 @@ tests:
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
+  capabilities:
+  - arm64
   postsubmit: true
   steps:
     dependencies:
@@ -155,7 +140,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.3
+      DESTINATION_BRANCH: backplane-2.17
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

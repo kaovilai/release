@@ -1,0 +1,11 @@
+{
+	"path": "openshift/microshift/infra/aws/pre/openshift-microshift-infra-aws-pre-chain.yaml",
+	"owners": {
+		"approvers": [
+			"microshift-approvers"
+		],
+		"reviewers": [
+			"microshift-reviewers"
+		]
+	}
+}

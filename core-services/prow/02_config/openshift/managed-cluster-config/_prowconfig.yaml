@@ -5,7 +5,7 @@ branch-protection:
         managed-cluster-config:
           required_status_checks:
             contexts:
-            - ci.ext.devshift.net PR build
+            - ci/prow/pr-check
 tide:
   queries:
   - labels:
@@ -13,7 +13,6 @@ tide:
     - lgtm
     missingLabels:
     - backports/unvalidated-commits
-    - bugzilla/invalid-bug
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
     - do-not-merge/work-in-progress

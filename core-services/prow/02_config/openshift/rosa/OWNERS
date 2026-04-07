@@ -5,27 +5,16 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- ciaranroche
+- braetroutman
+- davidleerh
 - gdbranco
-- igoihman
-- jeremyeder
-- jharrington22
-- jhernand
-- oriadler
-- pvasant
-- renan-campos
-- tbrisker
-- vkareh
-- zgalor
+- jerichokeyne
+- marcolan018
+- olucasfreitas
+- robpblake
+- yuwang-rh
 options: {}
 reviewers:
-- ciaranroche
-- gdbranco
-- igoihman
-- jharrington22
-- oriadler
-- pvasant
-- renan-campos
-- tbrisker
-- vkareh
-- zgalor
+- jerichokeyne
+- olucasfreitas
+- yuwang-rh

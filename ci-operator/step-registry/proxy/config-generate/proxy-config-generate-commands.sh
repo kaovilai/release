@@ -3,8 +3,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 proxy_public_url_file="${SHARED_DIR}/proxy_public_url"
+
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/proxy_public_url" ]]; then
+    # shellcheck disable=SC1091
+    proxy_public_url_file="${CLUSTER_PROFILE_DIR}/proxy_public_url"
+fi
 
 if [ ! -f "${proxy_public_url_file}" ]; then
     echo "Did not found proxy setting from ${proxy_public_url_file}"

@@ -6,12 +6,14 @@
 
 approvers:
 - dtantsur
-- hardys
+- elfosardo
 - honza
+- hroyrh
 - zaneb
 options: {}
 reviewers:
 - dtantsur
-- hardys
+- elfosardo
 - honza
+- hroyrh
 - zaneb

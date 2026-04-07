@@ -7,18 +7,24 @@
 approvers:
 - afreiberger
 - aweiteka
+- ayoung929
 - billmvt
-- c-e-brumm
-- cattias
-- jasonrhunter
+- brizrobbo
+- dkeohane
+- geowa4
+- jessesarn
+- krishvoor
 - pyates86
 - rh-wadhwani
-- tbeckham
+- sajeelirkal
 - wgordon17
 options: {}
 reviewers:
-- bdematte
 - bmeng
 - clcollins
 - iamkirkbater
-- mrbarge
+- makdaam
+- mitalibhalla
+- ravitri
+- tessg22
+- weherdh

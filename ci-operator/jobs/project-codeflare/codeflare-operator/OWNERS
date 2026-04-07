@@ -5,11 +5,26 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- anishasthana
-- kpostoffice
-- maxusmusti
+- astefanutti
+- chipspeak
+- christianzaccaria
+- kryanbeane
+- laurafitzgerald
+- pawelpaszki
+- sutaakar
+- szaher
+- varshaprasad96
 options: {}
 reviewers:
-- anishasthana
-- kpostoffice
-- maxusmusti
+- astefanutti
+- bobbins228
+- chipspeak
+- christianzaccaria
+- dimakis
+- fiona-waters
+- kryanbeane
+- laurafitzgerald
+- pawelpaszki
+- sutaakar
+- szaher
+- varshaprasad96

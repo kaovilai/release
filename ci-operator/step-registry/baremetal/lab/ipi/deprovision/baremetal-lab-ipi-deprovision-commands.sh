@@ -2,10 +2,25 @@
 
 set -o nounset
 
-[ -z "${PROVISIONING_HOST}" ] && { echo "\$PROVISIONING_HOST is not filled. Failing."; exit 1; }
+[ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/"${NAMESPACE}"/preserve && \
+    { echo "The cluster is expected to persist. Skipping deprovisioning..."; exit 0; }
+echo "No request to let the cluster persist detected. Deprovisioning..."
+
+[ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 echo "[INFO] Look for a bootstrap VM in the provisioning host and destroy it..."
-LIBVIRT_DEFAULT_URI="qemu+ssh://root@${PROVISIONING_HOST}/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1"
+LIBVIRT_DEFAULT_URI="qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1"
 export LIBVIRT_DEFAULT_URI
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
@@ -13,6 +28,19 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 if virsh list --all --name | grep -q "${CLUSTER_NAME}"; then
   echo "[INFO] found the bootstrap VM. Destroying it..."
   NAME=$(virsh list --all --name | grep "${CLUSTER_NAME}")
+  POOLNAME=$(virsh pool-list --all --name | grep "${CLUSTER_NAME}")
   virsh destroy "${NAME}"
   virsh undefine "${NAME}" --remove-all-storage --nvram --managed-save --snapshots-metadata --wipe-storage
+  if [ -n "${POOLNAME}" ]; then
+    virsh pool-destroy "${POOLNAME}"
+    virsh pool-undefine "${POOLNAME}"
+    # pool-delete fails because of presence of files other than the image file
+    # Deleting with rm instead after undefining the pool
+    rm -fr /var/lib/libvirt/openshift-images/"${POOLNAME}"
+  fi
 fi
+
+timeout -s 9 2m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" \
+bash -s -- "${CLUSTER_NAME}" << 'EOF'
+rm -rf /var/lib/libvirt/openshift-images/"${1}"-*-bootstrap
+EOF

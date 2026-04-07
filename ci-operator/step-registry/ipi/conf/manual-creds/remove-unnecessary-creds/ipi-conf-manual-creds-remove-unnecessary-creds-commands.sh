@@ -4,6 +4,32 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  echo "This step is not required when EXTRACT_MANIFEST_INCLUDED is set to true"
+  exit 0
+fi
+
 if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
   echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
   exit 0
@@ -43,7 +69,7 @@ rm /tmp/pull-secret
 
 echo "OCP Version: $ocp_version"
 
-if (( ocp_minor_version <=10 && ocp_major_version == 4 )) || (( ocp_major_version < 4 )); then
+if version_le "${ocp_version}" "4.10"; then
   echo "This step is not required for ${ocp_version}, exit now"
   exit 0
 fi
@@ -52,7 +78,12 @@ v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
-latest_defined="v413"
+v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
+v416=" ${v415} CloudControllerManager Ingress"
+v417=" ${v416}"
+v418=" ${v417} OperatorLifecycleManagerV1"
+latest_defined="v418"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -84,6 +115,21 @@ case ${BASELINE_CAPABILITY_SET} in
 "v4.13")
   enabled_operators="${v413}"
   ;;
+"v4.14")
+  enabled_operators="${v414}"
+  ;;
+"v4.15")
+  enabled_operators="${v415}"
+  ;;
+"v4.16")
+  enabled_operators="${v416}"
+  ;;
+"v4.17")
+  enabled_operators="${v417}"
+  ;;
+"v4.18")
+  enabled_operators="${v418}"
+  ;;
 "vCurrent")
   enabled_operators="${vCurrent}"
   ;;
@@ -96,14 +142,27 @@ esac
 # Base Capability + Additional Capability
 
 echo "Baseline Capability Set: $enabled_operators"
-echo "Additional Capability Set: $ADDITIONAL_ENABLED_CAPABILITY_SET"
-enabled_operators=$(echo "$enabled_operators $ADDITIONAL_ENABLED_CAPABILITY_SET" | xargs -n1 | sort -u | xargs)
+echo "Additional Capability Set: $ADDITIONAL_ENABLED_CAPABILITIES"
+enabled_operators=$(echo "$enabled_operators $ADDITIONAL_ENABLED_CAPABILITIES" | xargs -n1 | sort -u | xargs)
 echo "Enabled Capability Set: $enabled_operators"
 
 # Remove openshift-cluster-csi-drivers, >= 4.12
-if (( ocp_minor_version >=12 && ocp_major_version == 4 )); then
+if version_ge "${ocp_version}" "4.12"; then
   if [[ ! "${enabled_operators}" =~ "Storage" ]]; then
       namespace="openshift-cluster-csi-drivers"
+      remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
+  fi
+fi
+
+# Remove openshift-machine-api/openshift-image-registry secret, >= 4.14
+if version_ge "${ocp_version}" "4.14"; then
+  if [[ ! "${enabled_operators}" =~ "MachineAPI" ]]; then 
+      namespace="openshift-machine-api"
+      remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
+  fi
+
+  if [[ ! "${enabled_operators}" =~ "ImageRegistry" ]]; then
+      namespace="openshift-image-registry"
       remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
   fi
 fi

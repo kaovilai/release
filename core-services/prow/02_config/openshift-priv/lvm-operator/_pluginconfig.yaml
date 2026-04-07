@@ -3,3 +3,15 @@ approve:
   repos:
   - openshift-priv/lvm-operator
   require_self_approval: false
+plugins:
+  openshift-priv/lvm-operator:
+    plugins:
+    - approve
+    - golint
+    - goose
+    - jira
+    - owners-label
+    - pony
+    - sigmention
+    - size
+    - welcome

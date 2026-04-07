@@ -1,23 +1,14 @@
-base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
 build_root:
   from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.commitchecker
+    from: root
+    to: commitchecker
 promotion:
-  name: "4.14"
-  namespace: ocp
-releases:
-  initial:
-    integration:
-      name: "4.14"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.14"
-      namespace: ocp
+  to:
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     requests:
@@ -27,6 +18,16 @@ tests:
 - as: verify
   commands: |
     make verify --warn-undefined-variables
+  container:
+    from: src
+- as: verify-commitchecker
+  commands: |
+    make -C commitchecker verify
+  container:
+    from: src
+- as: test-commitchecker
+  commands: |
+    make -C commitchecker test
   container:
     from: src
 zz_generated_metadata:

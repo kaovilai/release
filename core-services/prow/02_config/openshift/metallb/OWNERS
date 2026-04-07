@@ -5,15 +5,11 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- dcbw
 - dougbtv
 - fedepaol
-- msherif1234
-- russellb
+- oribon
 options: {}
 reviewers:
-- dcbw
 - dougbtv
 - fedepaol
-- msherif1234
-- russellb
+- oribon

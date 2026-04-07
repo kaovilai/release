@@ -6,17 +6,13 @@
 
 approvers:
 - bmeng
-- jewzaam
-- mrbarge
 - ravitri
 - rogbas
 options: {}
 reviewers:
 - a7vicky
 - bmeng
-- jewzaam
-- jwai7
-- mrbarge
+- devppratik
 - ravitri
-- rendhalver
 - rogbas
+- shitaljante

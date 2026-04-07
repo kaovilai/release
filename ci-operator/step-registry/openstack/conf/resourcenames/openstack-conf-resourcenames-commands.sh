@@ -2,57 +2,64 @@
 
 set -Eeuo pipefail
 
+# Set the LEASED_RESOURCE as the CLUSTER_TYPE in case of
+# using openstack-vh-bm-rhos static pool of resources
+# https://issues.redhat.com/browse/OSASINFRA-3795
+[[ "${LEASED_RESOURCE:-}" == openstack* ]] && CLUSTER_TYPE="${LEASED_RESOURCE}"
+
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 
 declare -A external_network=(
-	['openstack-kuryr']='external'
 	['openstack-vexxhost']='public'
-        ['openstack-operators-vexxhost']='public'
+	['openstack-operators-vexxhost']='public'
 	['openstack-vh-mecha-central']='external'
-	['openstack-vh-mecha-az0']='external'
 	['openstack-nfv']='intel-dpdk'
 	['openstack-hwoffload']='external'
-	)
+	['openstack-nerc-dev']='provider'
+)
 
 declare -A controlplane_flavor=(
-	['openstack-kuryr']='m1.xlarge'
-	['openstack-vexxhost']='ci.m1.xlarge'
-        ['openstack-operators-vexxhost']='ci.m1.large'
+	['openstack-vexxhost']='shiftstack-ci.master'
+	['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
-	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge'
 	['openstack-hwoffload']='m1.xlarge'
-	)
+	['openstack-nerc-dev']='cpu-su.4'
+)
+
+declare -A controlplane_flavor_alternate=(
+	['openstack-vexxhost']='shiftstack-ci.master-alt'
+	['openstack-vh-mecha-central']='m1.xlarge.2'
+	['openstack-nfv']='m1.xlarge.2'
+	['openstack-hwoffload']='m1.xlarge.2'
+)
 
 declare -A compute_flavor=(
-	['openstack-kuryr']='m1.xlarge'
-	['openstack-vexxhost']='ci.m1.xlarge'
-        ['openstack-operators-vexxhost']='ci.m1.large'
+	['openstack-vexxhost']='shiftstack-ci.worker'
+	['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
-	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge.nfv'
-	['openstack-hwoffload']='m1.xlarge.nfv'
-	)
+	['openstack-hwoffload']='m1.xlarge'
+	['openstack-nerc-dev']='cpu-su.4'
+)
 
 declare -A compute_azs=(
-	['openstack-kuryr']=''
 	['openstack-vexxhost']=''
-        ['openstack-operators-vexxhost']=''
+	['openstack-operators-vexxhost']=''
 	['openstack-vh-mecha-central']=''
-	['openstack-vh-mecha-az0']='az0'
 	['openstack-nfv']=''
 	['openstack-hwoffload']=''
-	)
+	['openstack-nerc-dev']='nova'
+)
 
 declare -A bastion_flavor=(
-	['openstack-kuryr']=''
-	['openstack-vexxhost']='1vcpu_2gb'
-        ['openstack-operators-vexxhost']='ci.m1.small'
+	['openstack-vexxhost']='shiftstack-ci.bastion'
+	['openstack-operators-vexxhost']='ci.m1.small'
 	['openstack-vh-mecha-central']='m1.small'
-	['openstack-vh-mecha-az0']='m1.small'
 	['openstack-nfv']='m1.small'
 	['openstack-hwoffload']='m1.small'
-	)
+	['openstack-nerc-dev']='cpu-su.4'
+)
 
 if [[ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]]; then
 	if [[ -z "${CLUSTER_TYPE:-}" ]]; then
@@ -80,6 +87,17 @@ if [[ -z "${OPENSTACK_CONTROLPLANE_FLAVOR:-}" ]]; then
 	fi
 
 	OPENSTACK_CONTROLPLANE_FLAVOR="${controlplane_flavor["$CLUSTER_TYPE"]}"
+fi
+
+# This is optional. Failure to set results in an empty file in SHARED_DIR
+if [[ -z "${OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE:-}" ]]; then
+	if [[ -z "${CLUSTER_TYPE:-}" ]]; then
+		echo 'Set CLUSTER_TYPE or OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE to enable testing CPMS scaling'
+	elif ! [[ -v controlplane_flavor_alternate["$CLUSTER_TYPE"] ]]; then
+		echo "OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE value for CLUSTER_TYPE '$CLUSTER_TYPE' not known. Set OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE to enable testing CPMS scaling"
+	else
+		OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="${controlplane_flavor_alternate["$CLUSTER_TYPE"]}"
+	fi
 fi
 
 if [[ -z "${OPENSTACK_COMPUTE_FLAVOR:-}" ]]; then
@@ -124,25 +142,28 @@ if [[ -z "${BASTION_FLAVOR:-}" ]]; then
 	BASTION_FLAVOR="${bastion_flavor["$CLUSTER_TYPE"]}"
 fi
 
-cat <<< "$OPENSTACK_EXTERNAL_NETWORK"    > "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
-cat <<< "$OPENSTACK_CONTROLPLANE_FLAVOR" > "${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR"
-cat <<< "$OPENSTACK_COMPUTE_FLAVOR"      > "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR"
-cat <<< "$ZONES"                         > "${SHARED_DIR}/ZONES"
-cat <<< "$BASTION_FLAVOR"                > "${SHARED_DIR}/BASTION_FLAVOR"
+cat <<< "$OPENSTACK_EXTERNAL_NETWORK"              > "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
+cat <<< "$OPENSTACK_CONTROLPLANE_FLAVOR"           > "${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR"
+cat <<< "$OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE" > "${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE"
+cat <<< "$OPENSTACK_COMPUTE_FLAVOR"                > "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR"
+cat <<< "$ZONES"                                   > "${SHARED_DIR}/ZONES"
+cat <<< "$BASTION_FLAVOR"                          > "${SHARED_DIR}/BASTION_FLAVOR"
 
 
 # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
 # Now it looks like "ci-op-rl6z646h-65230".
 # We will remove "ci-op-" prefix from there to keep just last 14 characters. and it cannot start with a "-"
-UNSAFE_CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+UNSAFE_CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 cat <<< "${UNSAFE_CLUSTER_NAME/ci-??-/}" > "${SHARED_DIR}/CLUSTER_NAME"
 
 cat <<EOF
 CLUSTER_TYPE: $CLUSTER_TYPE
 OPENSTACK_EXTERNAL_NETWORK: $OPENSTACK_EXTERNAL_NETWORK
 OPENSTACK_CONTROLPLANE_FLAVOR: $OPENSTACK_CONTROLPLANE_FLAVOR
+OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE: $OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE
 OPENSTACK_COMPUTE_FLAVOR: $OPENSTACK_COMPUTE_FLAVOR
 CLUSTER_NAME: $(cat "${SHARED_DIR}/CLUSTER_NAME")
 ZONES: $ZONES
 BASTION_FLAVOR: $BASTION_FLAVOR
+PROW_JOB_ID: $PROW_JOB_ID
 EOF

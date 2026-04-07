@@ -7,9 +7,11 @@ chain:
   - chain: ipi-conf-azure
   - ref: ipi-conf-proxy
   - ref: ipi-conf-azure-provisionednetwork
-  - ref: ipi-conf-techpreview
+  - ref: ipi-conf-techpreview-do-not-use
+  - chain: azure-provision-service-principal-minimal-permission
   - chain: ipi-install
   - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
   env:
   - name: RESTRICTED_NETWORK
     default:  "yes"

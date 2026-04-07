@@ -5,11 +5,15 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- andyatmiami
+- caponetto
 - harshad16
-- lavlas
-- vaishnavihire
+- jstourac
+- paulovmr
 options: {}
 reviewers:
+- andyatmiami
+- caponetto
 - harshad16
-- lavlas
-- vaishnavihire
+- jstourac
+- paulovmr

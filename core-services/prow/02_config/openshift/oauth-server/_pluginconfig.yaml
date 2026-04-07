@@ -2,16 +2,12 @@ label:
   restricted_labels:
     openshift/oauth-server:
     - allowed_users:
-      - soltysh
-      - stlaz
-      - sttts
-      - s-urbaniak
+      - ibihim
       - tkashem
       label: backport-risk-assessed
     - allowed_users:
       - xingxingxia
-      - yaoli-redhat
-      - y4sht
+      - dpuniaredhat
       label: cherry-pick-approved
 plugins:
   openshift/oauth-server:

@@ -1,11 +1,9 @@
 ref:
   as: osd-ccs-cluster-operators-wait-ready
-  from_image:
-    namespace: ci
-    name: cli-ocm
-    tag: latest
+  from: ocm-cli
   grace_period: 10m
   commands: osd-ccs-cluster-operators-wait-ready-commands.sh
+  cli: latest
   resources:
     requests:
       cpu: 100m

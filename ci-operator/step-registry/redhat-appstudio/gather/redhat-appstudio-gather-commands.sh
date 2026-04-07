@@ -23,6 +23,9 @@ queue ${ARTIFACT_DIR}/applications_appstudio.json  oc --insecure-skip-tls-verify
 queue ${ARTIFACT_DIR}/buildpipelineselectors.json  oc --insecure-skip-tls-verify --request-timeout=5s get buildpipelineselectors.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/componentdetectionqueries.json  oc --insecure-skip-tls-verify --request-timeout=5s get componentdetectionqueries.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/components.json  oc --insecure-skip-tls-verify --request-timeout=5s get components.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/deploymenttargetclaims.json  oc --insecure-skip-tls-verify --request-timeout=5s get deploymenttargetclaims.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/deploymenttargetclasses.json  oc --insecure-skip-tls-verify --request-timeout=5s get deploymenttargetclasses.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/deploymenttargets.json  oc --insecure-skip-tls-verify --request-timeout=5s get deploymenttargets.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/enterprisecontractpolicies.json  oc --insecure-skip-tls-verify --request-timeout=5s get enterprisecontractpolicies.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/environments.json  oc --insecure-skip-tls-verify --request-timeout=5s get environments.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/integrationtestscenarios.json  oc --insecure-skip-tls-verify --request-timeout=5s get integrationtestscenarios.appstudio.redhat.com --all-namespaces -o json
@@ -39,6 +42,7 @@ queue ${ARTIFACT_DIR}/spiaccesstokenbindings.json  oc --insecure-skip-tls-verify
 queue ${ARTIFACT_DIR}/spiaccesstokendataupdates.json  oc --insecure-skip-tls-verify --request-timeout=5s get spiaccesstokendataupdates.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/spiaccesstokens.json  oc --insecure-skip-tls-verify --request-timeout=5s get spiaccesstokens.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/spifilecontentrequests.json  oc --insecure-skip-tls-verify --request-timeout=5s get spifilecontentrequests.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/remotesecrets.json oc --insecure-skip-tls-verify --request-timeout=5s get remotesecrets.appstudio.redhat.com --all-namespaces -o json
 
 # ArgoCD resources
 queue ${ARTIFACT_DIR}/applications_argoproj.json  oc --insecure-skip-tls-verify --request-timeout=5s get applications.argoproj.io --all-namespaces -o json
@@ -87,6 +91,14 @@ queue ${ARTIFACT_DIR}/useraccounts.json  oc --insecure-skip-tls-verify --request
 queue ${ARTIFACT_DIR}/usersignups.json  oc --insecure-skip-tls-verify --request-timeout=5s get usersignups.toolchain.dev.openshift.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/usertiers.json  oc --insecure-skip-tls-verify --request-timeout=5s get usertiers.toolchain.dev.openshift.com --all-namespaces -o json
 
+# Kueue Resources
+queue ${ARTIFACT_DIR}/admissionchecks.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get admissionchecks.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/clusterqueues.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get clusterqueues.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/localqueues.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get localqueues.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/resourceflavors.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get resourceflavors.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/workloadpriorityclasses.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get workloadpriorityclasses.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/workloads.kueue.x-k8s.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get workloads.kueue.x-k8s.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/kueues.operator.openshift.io.json  oc --insecure-skip-tls-verify --request-timeout=5s get kueues.operator.openshift.io --all-namespaces -o json
 
 # Non-namespaced resources
 queue ${ARTIFACT_DIR}/idlers.json  oc --insecure-skip-tls-verify --request-timeout=5s get idlers.toolchain.dev.openshift.com -o json
@@ -102,3 +114,22 @@ queue ${ARTIFACT_DIR}/clusterinterceptors.json  oc --insecure-skip-tls-verify --
 queue ${ARTIFACT_DIR}/clustertriggerbindings.json  oc --insecure-skip-tls-verify --request-timeout=5s get clustertriggerbindings.triggers.tekton.dev -o json
 queue ${ARTIFACT_DIR}/clusterregistrars.json  oc --insecure-skip-tls-verify --request-timeout=5s get clusterregistrars.singapore.open-cluster-management.io -o json
 queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --request-timeout=5s get gitopsservices.pipelines.openshift.io -o json
+
+
+# Must gather steps to collect OpenShift logs
+mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
+
+# Download the binary from mirror
+curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+chmod +x /tmp/mco-sanitize
+
+oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log
+
+# Sanitize MCO resources to remove sensitive information.
+# If the sanitizer fails, fall back to manual redaction.
+if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather-appstudio"; then
+  find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+fi       
+
+mkdir -p ${ARTIFACT_DIR}/must-gather-network-appstudio
+oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-network-appstudio -- gather_network_logs > ${ARTIFACT_DIR}/must-gather-network-appstudio/must-gather-network.log

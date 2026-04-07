@@ -13,50 +13,14 @@ function run_command() {
 
 # IBM Cloud CLI login
 function ibmcloud_login {
-  echo "Try to login..."
-  "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
-}
-
-function checkCli() {
   export IBMCLOUD_CLI=ibmcloud
-  export IBMCLOUD_HOME=/output  
-  echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."  
-  command -v "${IBMCLOUD_CLI}"
-  "${IBMCLOUD_CLI}" --version
-  "${IBMCLOUD_CLI}" plugin list
+  export IBMCLOUD_HOME=/output
+  region="${LEASED_RESOURCE}"
+  export region
+  "${IBMCLOUD_CLI}" config --check-version=false
+  echo "Try to login..."
+  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
-
-function run_command_with_retries() {
-  cmd="$1"
-  retries="$2"
-  interval="$3"
-
-  if [ X"$retries" == X"" ]; then
-      retries=20
-  fi
-
-  if [ X"$interval" == X"" ]; then
-      interval=30
-  fi
-
-  output=$(eval "$cmd"); ret=$?
-  try=1
-  set +o errexit
-  # avoid exit with "del Resource groups with active or pending reclamation instances can't be deleted"
-  while [ X"$ret" != X"0" ] && [ $try -lt $retries ]; do
-      sleep $interval
-      output=$(eval "$cmd"); ret=$?
-      try=$(expr $try + 1)
-  done
-  set -o errexit
-
-  if [ X"$try" == X"$retries" ]; then
-      return 2
-  fi
-  echo "$output"
-  return 0
-}
-
 
 function check_vpc() {
   local vpcName="$1" vpc_info_file="$2"
@@ -91,19 +55,14 @@ function delete_vpc() {
   run_command "${IBMCLOUD_CLI} is vpcd -f ${vpc_name}"
 }
 
-# ibmcloud should already be there
-checkCli
-
 ibmcloud_login
-
-region="${LEASED_RESOURCE}"
 
 vpc_name=$(cat "${SHARED_DIR}/ibmcloud_vpc_name")
 
 resource_group=$(cat "${SHARED_DIR}/ibmcloud_resource_group")
 echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpc_name}"
 
-"${IBMCLOUD_CLI}" target -g ${resource_group} -r ${region}
+"${IBMCLOUD_CLI}" target -g ${resource_group}
 
 echo "DEBUG" "Removing the vpc ${vpc_name} ..."
 delete_vpc "${vpc_name}"
@@ -114,7 +73,3 @@ if [[ $("${IBMCLOUD_CLI}" resource reclamations -q) == "No reclamation found" ]]
 else
   ${IBMCLOUD_CLI} resource reclamations -q |  awk '(NR>1) {print $1}' | xargs -n1 ibmcloud resource reclamation-delete -f
 fi
-
-echo "DEBUG" "Removing the resource group ${resource_group}"
-delCmd="${IBMCLOUD_CLI} resource group-delete -f ${resource_group}"
-run_command_with_retries "${delCmd}" 20 20

@@ -5,15 +5,16 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- emilienm
+- damdo
+- elmiko
+- gryf
+- joelspeed
 - mandre
-- mdbooth
-- pierreprinetti
+- nrb
+- radekmanak
 - stephenfin
 options: {}
 reviewers:
-- emilienm
+- gryf
 - mandre
-- mdbooth
-- pierreprinetti
 - stephenfin

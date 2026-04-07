@@ -1,47 +1,23 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/external-snapshotter
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: csi-external-snapshotter
-- dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: csi-snapshot-controller
-- dockerfile_path: Dockerfile.webhook.openshift.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: csi-snapshot-validation-webhook
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: csi-external-snapshotter
+  - dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
+    to: csi-snapshot-controller
+  - dockerfile_path: Dockerfile.webhook.openshift.rhel7
+    to: csi-snapshot-validation-webhook
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -64,17 +40,21 @@ tests:
     from: src
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
-- as: e2e-ovirt
-  optional: true
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-csi
 - as: e2e-gcp-csi
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

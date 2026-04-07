@@ -15,10 +15,6 @@ base_images:
     name: hyperconverged-cluster-index
     namespace: ci
     tag: 1.7.0-unstable
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -26,51 +22,48 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.12
 images:
-- dockerfile_path: build/Dockerfile.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-operator
-  to: hyperconverged-cluster-operator
-- dockerfile_path: build/Dockerfile.wh.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-webhook
-  to: hyperconverged-cluster-webhook
-- dockerfile_path: build/Dockerfile.artifacts
-  optional: true
-  to: virt-artifacts-server
-- dockerfile_path: build/Dockerfile.functest.ci
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: hyperconverged-cluster-functest
-- dockerfile_path: deploy/Dockerfile.src.ci
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y graphviz && dnf clean all
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image-nightly
+  items:
+  - dockerfile_path: build/Dockerfile.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-operator
+    to: hyperconverged-cluster-operator
+  - dockerfile_path: build/Dockerfile.wh.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-webhook
+    to: hyperconverged-cluster-webhook
+  - dockerfile_path: build/Dockerfile.artifacts
+    optional: true
+    to: virt-artifacts-server
+  - dockerfile_path: build/Dockerfile.functest.ci
+    to: hyperconverged-cluster-functest
+  - dockerfile_path: deploy/Dockerfile.src.ci
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y graphviz && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image-nightly
 operator:
   bundles:
   - context_dir: deploy/index-image
@@ -113,7 +106,7 @@ tests:
   steps:
     cluster_profile: azure-virtualization
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
@@ -145,7 +138,7 @@ tests:
   steps:
     cluster_profile: azure-virtualization
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
@@ -179,7 +172,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
@@ -201,7 +194,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.7.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
@@ -296,7 +289,7 @@ tests:
   steps:
     cluster_profile: azure-virtualization
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
@@ -423,7 +416,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
@@ -465,7 +458,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       OO_CHANNEL: 1.7.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged

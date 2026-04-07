@@ -3,34 +3,28 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  ubi8:
+  ubi9:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/baremetal-runtimecfg
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base-os
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: baremetal-runtimecfg
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base-os
+    to: baremetal-runtimecfg
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       rm -rf /etc/yum.repos.d/*
-      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
-    from: ubi8
+      curl http://base-4-15-rhel9.ocp.svc > /etc/yum.repos.d/base-4-15-rhel9.repo
+    from: ubi9
     to: base-os
 releases:
   initial:
@@ -48,6 +42,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/data/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
 - as: gofmt
   commands: make fmt
   container:
@@ -60,24 +62,30 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-metal-ipi
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   steps:
     cluster_profile: openstack-vexxhost

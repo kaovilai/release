@@ -6,6 +6,7 @@
 
 approvers:
 - dtthuynh
+- rhamini3
 - vboulos
 options: {}
 reviewers:
@@ -13,14 +14,13 @@ reviewers:
 - chenz4027
 - dtthuynh
 - fxiang1
-- jamestalton
 - jeswanke
 - kevinfcormier
 - mark-nc
 - mikeshng
 - philipwu08
 - randy424
-- robdolares
+- rhamini3
 - rokej
 - sahare
 - vboulos

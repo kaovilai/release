@@ -1,36 +1,22 @@
 base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-9-golang-1.19-openshift-4.14:
-    name: builder
+  ocp_4.14_base-rhel9:
+    name: "4.14"
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.14
+    tag: base-rhel9
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.14
-  to: ingress-node-firewall
-- dockerfile_path: Dockerfile.daemon.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.14
-  to: ingress-node-firewall-daemon
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: ocp_4.14_base-rhel9
+    to: ingress-node-firewall
+  - dockerfile_path: Dockerfile.daemon.openshift
+    from: ocp_4.14_base-rhel9
+    to: ingress-node-firewall-daemon
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -40,17 +26,18 @@ operator:
   - pullspec: quay.io/openshift/origin-ingress-node-firewall-daemon:4.13
     with: pipeline:ingress-node-firewall
 promotion:
-  name: "4.14"
-  namespace: ocp
+  to:
+  - name: "4.22"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -76,7 +63,8 @@ tests:
   container:
     from: src
 - as: ingress-node-firewall-e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -84,6 +72,12 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-ingress-node-firewall-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: master
   org: openshift

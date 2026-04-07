@@ -5,9 +5,24 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- andresllh
+- brettmthompson
+- danielezonca
+- israel-hdez
+- jlost
 - jooho
-- xaenalt
+- mholder6
+- spolti
+- terrytangyuan
+- vedantmahabaleshwarkar
 options: {}
 reviewers:
+- andresllh
+- brettmthompson
+- israel-hdez
+- jlost
 - jooho
-- xaenalt
+- mholder6
+- spolti
+- terrytangyuan
+- vedantmahabaleshwarkar

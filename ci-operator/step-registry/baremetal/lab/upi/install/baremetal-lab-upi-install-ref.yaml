@@ -9,10 +9,11 @@ ref:
     requests:
       cpu: '1'
       memory: 128Mi
+  timeout: 3h00m0s
   grace_period: 600
   env:
   - name: INTERNAL_NET_IP
-    default: "192.168.90.1"
+    default: "192.168.80.1"
     documentation: ""
   - name: architecture
     default: ""
@@ -26,6 +27,8 @@ ref:
   - name: AUX_HOST
     default: ""
     documentation: ""
+  - name: FIPS_ENABLED
+    default: "false"
   - name: ADDITIONAL_WORKERS
     default: "0"
     documentation: |
@@ -38,12 +41,10 @@ ref:
       Whether to add (power on) the additional workers after the cluster is installed.
       This is useful for testing multi-arch compute node clusters as a real day2 operation and is especially important
       for testing single-architectures clusters based on single-architecture payloads migrating to a multi-arch payload.
-      Also, at time of writing, the above path is the only one possible for multi-arch clusters with arm64 control plane
-      and additional amd64 workers (because the release image is not a manifest list when installing from Prow and 
-      this check would fail at installation time if installing an arm64 CP cluster from the multi payload: 
-      https://github.com/openshift/installer/blob/4daff6117fce1d73774b02caf605d9e1b836dd7c/data/data/bootstrap/files/usr/local/bin/release-image-download.sh.template#L36-L50).
   - name: DISCONNECTED
-    default: "false" 
+    default: "false"
+  - name: BOOTSTRAP_IN_PLACE
+    default: "false"
   dependencies:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE

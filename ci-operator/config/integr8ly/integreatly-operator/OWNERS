@@ -6,21 +6,23 @@
 
 approvers:
 - austincunningham
-- briangallagher
-- kevfan
-- laurafitzgerald
+- erdii
 - mstokluska
-- pmccarthy
+- nanyte25
 options: {}
 reviewers:
 - adam-cattermole
 - austincunningham
 - boomatang
 - briangallagher
+- carlkyrillos
+- den-rgb
+- erdii
 - kevfan
 - laurafitzgerald
-- makslion
 - mstokluska
+- nanyte25
+- patryk-stefanski
 - philbrookes
 - pmccarthy
 - trepel

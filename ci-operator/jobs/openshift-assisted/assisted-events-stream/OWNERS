@@ -8,16 +8,20 @@ filters:
   .*:
     approvers:
     - adriengentil
+    - crystalchun
     - danmanor
     - eliorerz
     - gamli75
-    - osherdp
+    - pastequo
     - rccrdpccl
+    - yoavsc0302
     reviewers:
     - adriengentil
+    - crystalchun
     - danmanor
     - eliorerz
     - gamli75
-    - osherdp
+    - pastequo
     - rccrdpccl
+    - yoavsc0302
 options: {}

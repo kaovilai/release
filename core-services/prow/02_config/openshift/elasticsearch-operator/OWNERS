@@ -9,16 +9,14 @@ filters:
     approvers:
     - alanconway
     - jcantrill
-    - periklis
+    - joaobravecoding
+    - xperimental
     reviewers:
     - alanconway
-    - aminesnow
     - btaani
     - jcantrill
-    - red-gv
+    - joaobravecoding
     - shwetaap
-    - syedriko
-    - vimalk78
     - xperimental
   Dockerfile(?:\.in)?$:
     labels:

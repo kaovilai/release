@@ -11,11 +11,15 @@ chain:
   - chain: ipi-conf-azure
   - ref: ipi-conf-mirror
   - ref: ipi-conf-azure-provisionednetwork
-  - ref: ipi-conf-techpreview
+  - ref: ipi-conf-techpreview-do-not-use
+  - chain: azure-provision-service-principal-minimal-permission
   - ref: ipi-install-install
   - ref: ipi-install-times-collection
   - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
   - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-fullyprivate
   env:
   - name: OUTBOUND_TYPE
     default:  "UserDefinedRouting"

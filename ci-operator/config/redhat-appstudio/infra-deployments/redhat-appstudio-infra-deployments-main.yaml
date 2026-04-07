@@ -1,5 +1,5 @@
-build_root:
-  image_stream_tag:
+base_images:
+  e2e-test-runner:
     name: redhat-appstudio
     namespace: ci
     tag: e2e-test-runner
@@ -8,7 +8,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.12"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -17,37 +17,103 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: appstudio-e2e-tests
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: appstudio-hac-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
   steps:
-    cluster_profile: aws
-    env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.4-multi
+    test:
+    - ref: redhat-appstudio-install-konflux
+    - ref: redhat-appstudio-hac-e2e
+    workflow: redhat-appstudio-claim
+- as: appstudio-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+  steps:
     test:
     - ref: redhat-appstudio-e2e
-    workflow: redhat-appstudio-install
+    workflow: redhat-appstudio-claim-failure-analysis
+- as: konflux-openshift-upgrade-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: 0 1 * * *
+  steps:
+    workflow: redhat-appstudio-openshift-upgrade
+- always_run: false
+  as: appstudio-upgrade-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  steps:
+    test:
+    - ref: redhat-appstudio-upgrade
+    workflow: redhat-appstudio-claim
+- always_run: false
+  as: appstudio-load-test
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-infra-dep
+    test:
+    - ref: redhat-appstudio-load-test-infra-deployments
+    workflow: redhat-appstudio-load-test
 - as: appstudio-e2e-tests-periodic
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-west-2
+    owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
-  cron: 0 */24 * * *
+    version: "4.18"
+  cron: 0 0 * * *
   steps:
     test:
     - ref: redhat-appstudio-e2e
     workflow: redhat-appstudio-claim
-- as: hacbs-e2e-periodic
+- always_run: false
+  as: konflux-e2e-v419-optional
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-west-2
+    owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
-  cron: 0 2 * * *
+    version: "4.19"
+  optional: true
   steps:
     test:
     - ref: redhat-appstudio-e2e

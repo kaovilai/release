@@ -5,13 +5,15 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- etmurasaki
 - jan--f
 - jgbernalp
 - kyoto
+- peteryurkovich
 - zhuje
 options: {}
 reviewers:
-- jan--f
+- etmurasaki
 - jgbernalp
-- kyoto
+- peteryurkovich
 - zhuje

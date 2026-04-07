@@ -1,33 +1,35 @@
 base_images:
-  os-min8:
+  os-min9:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make -f Makefile.kni build-noderesourcetopology-plugin
 build_root:
   project_image:
     dockerfile_path: build/noderesourcetopology-plugin/Dockerfile.tools
 images:
-- dockerfile_path: build/noderesourcetopology-plugin/Dockerfile.openshift
-  from: os-min8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/scheduler-plugins/bin/noderesourcetopology-plugin
-  to: scheduler-plugins
+  items:
+  - dockerfile_path: build/noderesourcetopology-plugin/Dockerfile.openshift
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/scheduler-plugins/bin/noderesourcetopology-plugin
+    to: scheduler-plugins
 promotion:
-  name: scheduler-plugins
-  namespace: ocp-kni
+  to:
+  - name: scheduler-plugins
+    namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -39,6 +41,12 @@ tests:
   commands: make -f Makefile.kni unit-test-quick
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: noderesourcetopology-scheduler
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-kni

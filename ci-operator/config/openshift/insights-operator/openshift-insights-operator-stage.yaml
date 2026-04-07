@@ -11,23 +11,17 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: stage
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: insights-operator
+  items:
+  - from: base
+    to: insights-operator
 promotion:
-  disabled: true
-  name: "4.12"
-  namespace: ocp
+  to:
+  - disabled: true
+    name: "4.12"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -59,7 +53,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
   steps:
@@ -81,7 +75,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-periodic
-  cron: 0 0 * * *
+  cron: 18 22 */4,15 * *
   steps:
     cluster_profile: gcp
     pre:
@@ -101,7 +95,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: insights-operator-test-time-periodic
-  cron: 0 0 * * *
+  cron: 11 21 */14,28 * *
   steps:
     cluster_profile: gcp
     pre:
@@ -117,7 +111,8 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6

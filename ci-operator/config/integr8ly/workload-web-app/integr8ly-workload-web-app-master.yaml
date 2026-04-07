@@ -2,15 +2,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_path: Dockerfile
-  to: workload-web-app
-- dockerfile_path: Dockerfile.tools
-  to: workload-web-app-tools
+  items:
+  - dockerfile_path: Dockerfile
+    to: workload-web-app
+  - dockerfile_path: Dockerfile.tools
+    to: workload-web-app-tools
 promotion:
-  name: workload-web-app
-  namespace: integr8ly
+  to:
+  - name: workload-web-app
+    namespace: integr8ly
 resources:
   '*':
     requests:

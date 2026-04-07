@@ -11,3 +11,9 @@ plugins:
   openshift/openstack-ironic:
     plugins:
     - approve
+triggers:
+- repos:
+  - openshift/openstack-ironic
+  trusted_apps:
+  - ironic-merge-bot
+  - openshift-merge-bot

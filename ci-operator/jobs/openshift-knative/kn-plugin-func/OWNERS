@@ -5,11 +5,10 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- lance
+- creydr
+- dsimansk
+- gauron99
 - matejvasek
-- zroubalik
 options: {}
 reviewers:
-- dsimansk
-- jcrossley3
 - jrangelramos

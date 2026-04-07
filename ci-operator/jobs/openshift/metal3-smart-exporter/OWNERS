@@ -10,9 +10,7 @@ approvers:
 - dhellmann
 - dtantsur
 - elfosardo
-- hardys
 - juliakreger
-- russellb
 options: {}
 reviewers:
 - bfournie
@@ -20,6 +18,4 @@ reviewers:
 - dhellmann
 - dtantsur
 - elfosardo
-- hardys
 - juliakreger
-- russellb

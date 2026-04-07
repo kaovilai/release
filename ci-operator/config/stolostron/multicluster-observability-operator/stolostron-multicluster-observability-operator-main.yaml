@@ -2,72 +2,36 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: operators/multiclusterobservability/Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: multicluster-observability-operator
-- dockerfile_path: proxy/Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: rbac-query-proxy
-- dockerfile_path: operators/endpointmetrics/Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: endpoint-monitoring-operator
-- dockerfile_path: tests/Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: observability-e2e-test
-- dockerfile_path: collectors/metrics/Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: metrics-collector
-- dockerfile_path: loaders/dashboards/Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: grafana-dashboard-loader
+  items:
+  - dockerfile_path: operators/multiclusterobservability/Dockerfile
+    from: base
+    to: multicluster-observability-operator
+  - dockerfile_path: proxy/Dockerfile
+    from: base
+    to: rbac-query-proxy
+  - dockerfile_path: operators/endpointmetrics/Dockerfile
+    from: base
+    to: endpoint-monitoring-operator
+  - dockerfile_path: tests/Dockerfile
+    from: base
+    to: observability-e2e-test
+  - dockerfile_path: collectors/metrics/Dockerfile
+    from: base
+    to: metrics-collector
+  - dockerfile_path: loaders/dashboards/Dockerfile
+    from: base
+    to: grafana-dashboard-loader
 promotion:
-  name: "2.8"
-  namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.8"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.8"
-      namespace: ocp
+  to:
+  - name: "2.17"
+    namespace: stolostron
 resources:
   '*':
     limits:
@@ -88,7 +52,7 @@ tests:
       IMAGE_REPO: multicluster-observability-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: pr-image-mirror-bac-query-proxy
+- as: pr-image-mirror-rbac-query-proxy
   steps:
     dependencies:
       SOURCE_IMAGE_REF: rbac-query-proxy
@@ -126,6 +90,7 @@ tests:
     VERBOSE="-v" make unit-tests
   container:
     from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: e2e-kind
   steps:
     env:
@@ -166,17 +131,20 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e
-  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
+  skip_if_only_changed: ^docs/|hack/|^\.tekton/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
+    allow_skip_on_success: true
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
-      ACM_RELEASE_VERSION: release-2.8
+      ACM_RELEASE_VERSION: release-2.16
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-421
       CLUSTERPOOL_LIFETIME: 1h
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: sno-4xlarge
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      CLUSTERPOOL_MANAGED_FILTER: sno-421
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
         LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
@@ -191,15 +159,31 @@ tests:
         IC0gJyonCiAgICBhcGlHcm91cHM6CiAgICAtICdvYXV0aC5vcGVuc2hpZnQuaW8nCiAgICByZXNv
         dXJjZXM6CiAgICAtIG9hdXRoY2xpZW50cwogIC0gdmVyYnM6CiAgICAtICcqJwogICAgYXBpR3Jv
         dXBzOgogICAgLSAnYWRkb24ub3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQuaW8nCiAgICByZXNvdXJj
-        ZXM6CiAgICAtIGFkZG9uZGVwbG95bWVudGNvbmZpZ3MKLS0tCmtpbmQ6IENsdXN0ZXJSb2xlQmlu
-        ZGluZwphcGlWZXJzaW9uOiByYmFjLmF1dGhvcml6YXRpb24uazhzLmlvL3YxCm1ldGFkYXRhOgog
-        IG5hbWU6IG11bHRpY2x1c3Rlci1vYnNlcnZhYmlsaXR5LW9wZXJhdG9yLWUyZS10ZXN0aW5nCnJv
-        bGVSZWY6CiAgYXBpR3JvdXA6IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8KICBraW5kOiBDbHVz
-        dGVyUm9sZQogIG5hbWU6IG11bHRpY2x1c3Rlci1vYnNlcnZhYmlsaXR5LW9wZXJhdG9yLWUyZS10
-        ZXN0aW5nCnN1YmplY3RzOgotIGtpbmQ6IFNlcnZpY2VBY2NvdW50CiAgbmFtZTogbXVsdGljbHVz
-        dGVyLW9ic2VydmFiaWxpdHktb3BlcmF0b3IKICBuYW1lc3BhY2U6IG9wZW4tY2x1c3Rlci1tYW5h
-        Z2VtZW50Ci0tLQ==
+        ZXM6CiAgICAtIGFkZG9uZGVwbG95bWVudGNvbmZpZ3MKICAtIGFwaUdyb3VwczoKICAgIC0gYWRk
+        b24ub3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQuaW8KICAgIHJlc291cmNlczoKICAgIC0gbWFuYWdl
+        ZGNsdXN0ZXJhZGRvbnMKICAgIC0gbWFuYWdlZGNsdXN0ZXJhZGRvbnMvc3RhdHVzCiAgICAtIG1h
+        bmFnZWRjbHVzdGVyYWRkb25zL2ZpbmFsaXplcnMKICAgIHZlcmJzOgogICAgLSB3YXRjaAogICAg
+        LSBjcmVhdGUKICAgIC0gdXBkYXRlCiAgICAtIGRlbGV0ZQogICAgLSBnZXQKICAgIC0gbGlzdAog
+        ICAgLSBwYXRjaAotLS0Ka2luZDogQ2x1c3RlclJvbGVCaW5kaW5nCmFwaVZlcnNpb246IHJiYWMu
+        YXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKbWV0YWRhdGE6CiAgbmFtZTogbXVsdGljbHVzdGVyLW9i
+        c2VydmFiaWxpdHktb3BlcmF0b3ItZTJlLXRlc3RpbmcKcm9sZVJlZjoKICBhcGlHcm91cDogcmJh
+        Yy5hdXRob3JpemF0aW9uLms4cy5pbwogIGtpbmQ6IENsdXN0ZXJSb2xlCiAgbmFtZTogbXVsdGlj
+        bHVzdGVyLW9ic2VydmFiaWxpdHktb3BlcmF0b3ItZTJlLXRlc3RpbmcKc3ViamVjdHM6Ci0ga2lu
+        ZDogU2VydmljZUFjY291bnQKICBuYW1lOiBtdWx0aWNsdXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVy
+        YXRvcgogIG5hbWVzcGFjZTogb3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQKLS0tCg==
       PIPELINE_STAGE: dev
+    post:
+    - as: obs-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=registry.redhat.io/rhacm2/acm-must-gather-rhel9:v2.12
+        /usr/bin/gather_observability_log --dest-dir=${ARTIFACT_DIR}/must-gather --insecure-skip-tls-verify
+      from: base-tests
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
     test:
     - as: e2e
       commands: |
@@ -207,6 +191,31 @@ tests:
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
         echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        CTX_HUB_CLUSTER=$(oc config current-context)
+        oc create namespace managed --dry-run=client -o yaml | oc apply -f -
+
+        cat <<EOF | oc apply -f -
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          name: managed
+          labels:
+            cloud: auto-detect
+            vendor: auto-detect
+        spec:
+          hubAcceptsClient: true
+        EOF
+
+        oc create secret generic auto-import-secret \
+          -n managed \
+          --from-file=kubeconfig="${SHARED_DIR}/managed-1.kc" \
+          --dry-run=client -o yaml | oc apply -f -
+        oc wait managedcluster managed \
+          --for=condition=ManagedClusterConditionAvailable=True \
+          --timeout=300s
+        oc get managedcluster --context "${CTX_HUB_CLUSTER}"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
@@ -226,30 +235,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: sonarcloud
-  commands: |
-    export SELF="make"
-    make sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonarcloud-post-submit
-  commands: |
-    export SELF="make"
-    make sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: fast-forward
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.8
+      DESTINATION_BRANCH: release-2.17
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

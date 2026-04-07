@@ -7,16 +7,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
-- dockerfile_path: hack/Dockerfile.upgrade.src.ci
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-upgrade-ci
+  items:
+  - dockerfile_path: hack/Dockerfile.upgrade.src.ci
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-upgrade-ci
 releases:
   initial:
     integration:
@@ -35,11 +36,13 @@ resources:
       cpu: 100m
       memory: 600Mi
 tests:
-- as: e2e-deploy
+- always_run: false
+  as: e2e-deploy
   steps:
     cluster_profile: azure-virtualization
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
     test:
     - as: test
       cli: latest
@@ -67,11 +70,13 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
     cluster_profile: azure-virtualization
     env:
-      BASE_DOMAIN: cnv.azure.devcluster.openshift.com
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
     test:
     - as: test
       commands: make upgrade_test

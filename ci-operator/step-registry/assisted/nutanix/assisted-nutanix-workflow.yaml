@@ -1,6 +1,7 @@
 workflow:
   as: assisted-nutanix
   steps:
+    allow_skip_on_success: true 
     pre:
       - chain: assisted-nutanix-setup
       - chain: assisted-common-pre
@@ -9,10 +10,11 @@ workflow:
     test:
       - ref: assisted-common-verify
     post:
-      - chain: gather
+      - ref: gather-extra
+      - ref: gather-audit-logs
       - ref: assisted-common-gather
       - chain: assisted-nutanix-teardown
     env:
-      TEST_SUITE: minimal
+      TEST_SUITE: none
   documentation: |-
     This workflow installs an OCP cluster by running assisted-installer on a nutanix cluster.

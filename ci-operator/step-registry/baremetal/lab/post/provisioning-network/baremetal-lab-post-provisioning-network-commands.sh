@@ -2,18 +2,29 @@
 
 set -o nounset
 
+[ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
 if [ ! -f "${SHARED_DIR}/provisioning_network" ]; then
   echo "No need to rollback the provisioning network. Skipping..."
   exit 0
 fi
 
-[ -z "${PROVISIONING_HOST}" ] && { echo "PROVISIONING_HOST is not filled. Failing."; exit 1; }
-[ -z "${PROVISIONING_NET_DEV}" ] && { echo "PROVISIONING_NET_DEV is not filled. Failing."; exit 1; }
+[ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
-# As the API_VIP is unique in the managed network and based on how it is reserved in the reservation steps,
-# we use the last part of it to define the VLAN ID.
-# TODO: find a similar unique value for dual stack and ipv6 single stack configurations?
-VLAN_ID=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
+# Use the last octet of the first master node as the VLAN ID to keep it unique in the managed network
+VLAN_ID=$(yq '.[] | select(.name|test("master-00")).ip' "${SHARED_DIR}/hosts.yaml")
 VLAN_ID=${VLAN_ID//*\./}
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"
@@ -71,7 +82,7 @@ for switch_address in switches:
                     # If the port is not a trunk port, we add a default vlan tag
                     if not port.startswith("T"):
                         cu.load(
-                            f"set interfaces {port} unit 0 family ethernet-switching vlan members vlan8",
+                            f"set interfaces {port} unit 0 family ethernet-switching vlan members 1010",
                             format="set"
                         )
                 # We finally delete the vlan and commit
@@ -97,20 +108,13 @@ interfaces:
 - name: br-${CLUSTER_NAME: -12}
   type: linux-bridge
   state: absent
-- name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+- name: prov.${VLAN_ID}
   type: vlan
   state: absent
 "
 
-SSHOPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-  -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
-
 echo "[INFO] Rolling back the provisioning network configuration via the NMState specs"
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'"  << 'EOF'
 echo "$1" | nmstatectl apply -
 EOF

@@ -3,25 +3,18 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: rhel-8-release-golang-1.20-openshift-4.15
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-  to: baremetal-hardware-event-proxy-operator
-- dockerfile_path: bundle.Dockerfile
-  to: baremetal-hardware-event-proxy-operator-bundle
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: baremetal-hardware-event-proxy-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: baremetal-hardware-event-proxy-operator-bundle
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -29,8 +22,9 @@ operator:
   - pullspec: quay.io/openshift/baremetal-hardware-event-proxy-operator:.*
     with: pipeline:baremetal-hardware-event-proxy-operator
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -51,11 +45,29 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.15
+        ci-job-fullname redhat-cne-e2e-aws-hw-event-proxy-operator-release-4.15
+        ci-job-type e2e-aws
+        ci-repo-name hw-event-proxy-operator
+        ci-org-name redhat-cne
     workflow: openshift-e2e-aws
 - as: e2e-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.15
+        ci-job-fullname redhat-cne-e2e-operator-hw-event-proxy-operator-release-4.15
+        ci-job-type e2e-operator
+        ci-repo-name hw-event-proxy-operator
+        ci-org-name redhat-cne
     test:
     - as: e2e-operator
       cli: latest

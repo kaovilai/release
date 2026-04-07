@@ -3,23 +3,12 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.23:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.23
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
-images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: osdctl
+  from_repository: true
 resources:
   '*':
     requests:
@@ -27,6 +16,11 @@ resources:
       memory: 200Mi
 tests:
 - as: lint
+  commands: |
+    make lint
+  container:
+    from: src
+- as: format
   commands: |
     make format
   container:
@@ -39,6 +33,11 @@ tests:
 - as: build
   commands: |
     make ci-build
+  container:
+    from: src
+- as: verify-docs
+  commands: |
+    make verify-docs
   container:
     from: src
 zz_generated_metadata:

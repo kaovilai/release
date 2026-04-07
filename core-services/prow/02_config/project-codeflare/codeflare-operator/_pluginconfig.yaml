@@ -43,9 +43,9 @@ plugins:
     - owners-label
     - wip
     - yuks
-    - approve
 triggers:
 - repos:
   - project-codeflare/codeflare-operator
   trusted_apps:
   - dependabot
+  - openshift-merge-bot

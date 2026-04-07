@@ -5,7 +5,6 @@ workflow:
     pre:
     - chain: ipi-conf-aws
     - ref: ipi-conf-cpu-partitioning
-    - ref: ipi-conf-feature-set
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test

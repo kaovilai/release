@@ -3,10 +3,6 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.17:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
   os-min8:
     name: ubi-minimal
     namespace: ocp
@@ -16,29 +12,23 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- context_dir: .
-  dockerfile_path: cnf-tests/Dockerfile.openshift
-  from: base
-  inputs:
-    openshift_release_golang-1.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: cnf-tests
-- context_dir: tools/s2i-dpdk/
-  dockerfile_path: Dockerfile
-  from: base
-  to: dpdk
-- context_dir: .
-  dockerfile_path: ztp/resource-generator/Containerfile
-  from: os-min8
-  inputs:
-    openshift_release_golang-1.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: ztp-site-generator
+  items:
+  - context_dir: .
+    dockerfile_path: cnf-tests/Dockerfile.openshift
+    from: base
+    to: cnf-tests
+  - context_dir: tools/s2i-dpdk/
+    dockerfile_path: Dockerfile
+    from: base
+    to: dpdk
+  - context_dir: .
+    dockerfile_path: ztp/resource-generator/Containerfile
+    from: os-min8
+    to: ztp-site-generator
 promotion:
-  name: "4.11"
-  namespace: ocp-kni
+  to:
+  - name: "4.11"
+    namespace: ocp-kni
 releases:
   initial:
     integration:
@@ -59,25 +49,19 @@ tests:
   commands: make ci-job
   container:
     from: src
-- as: e2e-gcp-ovn
-  skip_if_only_changed: ^ztp
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e-gcp-ovn
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp-ovn
 - as: e2e-aws-ran-profile
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.11
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ran-profile-release-4.11
+        ci-job-type e2e-aws-ran-profile
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
     test:
     - as: e2e-aws-ran-profile
       commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
@@ -88,21 +72,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-ovn
-- as: e2e-gcp-ovn-periodic
-  cron: 26 21 */1 * 1-5
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e-gcp-ovn-periodic
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-kni

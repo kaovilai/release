@@ -1,6 +1,7 @@
+import configparser
 import glob
 import os
-import configparser
+
 
 def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
     hyphened_version = f'{major_minor.replace(".", "-")}'
@@ -13,7 +14,7 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
         # will actually hit the upstream repos.
         repo_config = configparser.ConfigParser()
         repo_config.read(repo_file, encoding='utf-8')
-        first_section_id = repo_config.sections()[0]
+        # first_section_id = repo_config.sections()[0]
 
         # Unfortunately, there is a legacy mapping from .repo file to service name.
         # Perform that mapping now.
@@ -52,7 +53,10 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
             'kind': 'Deployment',
             'metadata': {
                 'annotations': {
-                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"mirror\\")].image"}]'
+                    'keel.sh/policy': 'force',
+                    'keel.sh/matchTag': 'true',
+                    'keel.sh/trigger': 'poll',
+                    'keel.sh/pollSchedule': '@every 5m'
                 },
                 'labels': {
                     'app': service_name
@@ -84,8 +88,11 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                         '--path=/tmp/config',
                                         '--max-size=5g',
                                         '--timeout=30m',
-                                        '/tmp/repos'],
-                            'image': ' ',
+                                        '/tmp/repos',
+                                        "/tmp/key",
+                                        "/tmp/mirror-enterprise-basic-auth"],
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_content-mirror_latest',
+                            'imagePullPolicy': 'Always',
                             'name': 'mirror',
                             'ports': [{
                                 'containerPort': 8080,
@@ -117,16 +124,20 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                 },
                             },
                             'workingDir': '/tmp/repos',
-                            'livenessProbe': {
-                                'httpGet': {
-                                    # All repos have repomd.xml, so we should be able to read it.
-                                    'path': f'/{first_section_id}/repodata/repomd.xml',
-                                    'port': 8080,
-                                },
-                                'initialDelaySeconds': 120,
-                                'periodSeconds': 120,
-                            }
+                            # 'livenessProbe': {
+                            #     'httpGet': {
+                            #         # All repos have repomd.xml, so we should be able to read it.
+                            #         'path': f'/{first_section_id}/repodata/repomd.xml',
+                            #         'port': 8080,
+                            #     },
+                            #     'initialDelaySeconds': 120,
+                            #     'periodSeconds': 120,
+                            # }
                         }],
+                        'nodeSelector': {
+                            'kubernetes.io/os': 'linux',
+                            'kubernetes.io/arch': 'amd64'
+                        },
                         'volumes': [
                             {
                                 'configMap': {

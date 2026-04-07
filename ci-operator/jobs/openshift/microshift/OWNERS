@@ -5,19 +5,24 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- chiragkyal
+- agullon
 - copejon
-- dhellmann
-- eggfoobar
+- eslutsky
 - ggiguash
+- jerpeter1
+- jogeo
+- kasturinarra
 - pacevedom
-- pliurh
 - pmtk
-- zshi-redhat
 options: {}
 reviewers:
+- agullon
 - copejon
-- dhellmann
+- eslutsky
 - ggiguash
+- jerpeter1
+- jogeo
+- kasturinarra
 - pacevedom
 - pmtk
+- vanhalenar

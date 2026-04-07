@@ -1,28 +1,16 @@
-base_images:
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
-  stolostron_builder_go1.19-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.19-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  inputs:
-    stolostron_builder_go1.19-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
-  to: cluster-curator-controller
+  items:
+  - dockerfile_path: Dockerfile.prow
+    to: cluster-curator-controller
 promotion:
-  disabled: true
-  name: "2.3"
-  namespace: stolostron
+  to:
+  - name: "2.17"
+    namespace: stolostron
 resources:
   '*':
     requests:
@@ -37,6 +25,9 @@ tests:
   commands: |
     export SONAR_GO_TEST_ARGS="-short ./..."
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export PATH=$PATH:$(go env GOPATH)/bin
+    go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+    export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.30)
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -47,6 +38,9 @@ tests:
   commands: |
     export SONAR_GO_TEST_ARGS="-short ./..."
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export PATH=$PATH:$(go env GOPATH)/bin
+    go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+    export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.30)
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -76,7 +70,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.3
+      DESTINATION_BRANCH: backplane-2.17
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

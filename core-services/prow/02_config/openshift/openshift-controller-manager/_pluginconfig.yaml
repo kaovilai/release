@@ -2,21 +2,28 @@ label:
   restricted_labels:
     openshift/openshift-controller-manager:
     - allowed_users:
-      - akram
-      - coreydaley
+      - adambkaplan
+      - apoorvajagtap
+      - sayan-biswas
       - ingvagabund
-      - soltysh
-      - stlaz
-      - sttts
-      - s-urbaniak
       - tkashem
+      - p0lyn0mial
+      - benluddy
+      - prabhapa
+      - moebasim
       label: backport-risk-assessed
     - allowed_users:
+      - adambkaplan
+      - apoorvajagtap
+      - sayan-biswas
       - jitendar-singh
-      - prietyc123
       - xingxingxia
       - wangke19
       - gangwgr
+      - kasturinarra
+      - zhouying7780
+      - prabhapa
+      - moebasim
       label: cherry-pick-approved
 plugins:
   openshift/openshift-controller-manager:

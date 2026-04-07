@@ -1,5 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: deck
+  namespace: openshift
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -83,10 +86,39 @@ objects:
           app: prow
           component: deck
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    component: deck
+                topologyKey: topology.kubernetes.io/zone
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  component: deck
+              topologyKey: kubernetes.io/hostname
         serviceAccountName: deck
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20230405-46d7922c2a
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260328-dc2bbc9fc
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -98,9 +130,9 @@ objects:
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --tide-url=http://tide/
-          - --hook-url=http://hook:8888/plugin-help
+          - --hook-url=http://hook-apps:8888/plugin-help
           - --oauth-url=/github-login
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --spyglass=true
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
@@ -108,6 +140,8 @@ objects:
           - --supplemental-plugin-config-dir=/etc/plugins
           - --kubeconfig-dir=/etc/build-farm-credentials
           - --kubeconfig-suffix=config
+          - --tenant-id=GlobalDefaultID
+          - --tenant-id=gangway-api
           env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -123,13 +157,13 @@ objects:
             httpGet:
               path: /healthz
               port: 8081
-            initialDelaySeconds: 10
+            initialDelaySeconds: 120
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthz/ready
               port: 8081
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120
             periodSeconds: 10
             timeoutSeconds: 600
           volumeMounts:
@@ -153,16 +187,33 @@ objects:
           - name: cookie-secret
             mountPath: /etc/cookie
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
           resources:
             requests:
-              memory: "5Gi"
+              memory: "11Gi"
               cpu: "500m"
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         volumes:
         - name: github-app-credentials
           secret:
@@ -187,55 +238,8 @@ objects:
         - name: cookie-secret
           secret:
             secretName: cookie
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.0
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -249,7 +253,7 @@ objects:
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
-      termination: Reencrypt
+      termination: reencrypt
     to:
       kind: Service
       name: deck-internal
@@ -297,10 +301,57 @@ objects:
           app: prow
           component: deck-internal
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    component: deck-internal
+                topologyKey: topology.kubernetes.io/zone
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  component: deck-internal
+              topologyKey: kubernetes.io/hostname
         serviceAccountName: deck
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: oauth-proxy
-          image: quay.io/openshift/origin-oauth-proxy:4.9
+          image: quay.io/openshift/origin-oauth-proxy:4.16
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 8443
@@ -327,7 +378,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20230405-46d7922c2a
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260328-dc2bbc9fc
           args:
           - --github-oauth-config-file=/etc/oauth/config.json
           - --github-app-id=$(GITHUB_APP_ID)
@@ -338,9 +389,9 @@ objects:
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --tide-url=http://tide/
-          - --hook-url=http://hook:8888/plugin-help
+          - --hook-url=http://hook-apps:8888/plugin-help
           - --hidden-only=true
           - --spyglass=true
           - --cookie-secret=/etc/proxy/secrets/session_secret
@@ -366,13 +417,13 @@ objects:
             httpGet:
               path: /healthz
               port: 8081
-            initialDelaySeconds: 10
+            initialDelaySeconds: 120
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthz/ready
               port: 8081
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120
             periodSeconds: 10
             timeoutSeconds: 600
           volumeMounts:
@@ -398,15 +449,14 @@ objects:
           - name: oauth-config
             mountPath: /etc/oauth
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
           resources:
             requests:
-              memory: "5Gi"
+              memory: "11Gi"
               cpu: "500m"
         volumes:
         - name: github-app-credentials
@@ -438,56 +488,33 @@ objects:
         - name: deck-internal-tls
           secret:
             secretName: deck-internal-tls
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
         - name: build-farm-credentials
           secret:
             secretName: deck
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+  spec:
+    minAvailable: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal
+  spec:
+    minAvailable: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck-internal
 - apiVersion: v1
   kind: Secret
   metadata:

@@ -3,9 +3,11 @@ kind: Ingress
 metadata:
   annotations:
     cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: 120s
   name: grafana-loki
   namespace: grafana-loki
 spec:
+  ingressClassName: openshift-default
   tls:
     - secretName: grafana-loki-tls
       hosts:

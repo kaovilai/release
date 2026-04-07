@@ -6,24 +6,24 @@
 
 approvers:
 - abays
+- bogdando
+- danpawlik
 - dprince
-- fao89
-- fultonj
-- olliewalsh
+- gibizer
+- jamepark4
+- karelyatin
+- rabi
 - rebtoor
-- sandeepyadav93
+- seanmooney
 - slagle
+- slawqo
 - stuggi
-- viroel
 options: {}
 reviewers:
 - abays
+- danpawlik
 - dprince
-- fao89
-- fultonj
-- olliewalsh
+- rabi
 - rebtoor
-- sandeepyadav93
 - slagle
 - stuggi
-- viroel

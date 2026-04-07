@@ -12,7 +12,7 @@ ref:
   grace_period: 600
   env:
     - name: INTERNAL_NET_IP
-      default: "192.168.90.1"
+      default: "192.168.80.1"
       documentation: ""
     - name: AUX_HOST
       default: ""
@@ -29,6 +29,8 @@ ref:
     - name: ADDITIONAL_WORKER_ARCHITECTURE
       default: ""
       documentation: "The architecture of the additional workers"
+    - name: ADDITIONAL_WORKERS_DAY2
+      default: "false"
   dependencies:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE

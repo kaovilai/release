@@ -1,11 +1,14 @@
 reviewers:
-  - stevekuznetsov
-  - soltysh
   - adelton
-  - liggitt
   - danmcp
+  - p0lyn0mial
+  - benluddy
+  - vrutkovs
+  - ingvagabund
 approvers:
-  - stevekuznetsov
-  - soltysh
-  - liggitt
   - danmcp
+  - p0lyn0mial
+  - benluddy
+  - vrutkovs
+  - ingvagabund
+

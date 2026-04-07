@@ -1,10 +1,7 @@
 ref:
   as: osd-ccs-fleet-manager-sc-deprovision
-  from_image:
-    namespace: ci
-    name: cli-ocm
-    tag: latest
-  timeout: 2h30m0s
+  from: ocm-cli
+  timeout: 1h0m0s
   grace_period: 10m
   commands: osd-ccs-fleet-manager-sc-deprovision-commands.sh
   resources:
@@ -13,7 +10,7 @@ ref:
       memory: 300Mi
   env:
   - name: OCM_LOGIN_ENV
-    default: "staging"
-    documentation: The environment for ocm login. The supported values are [production, staging].
+    default: "integration"
+    documentation: The environment for ocm login. The supported values are [integration].
   documentation: |-
     Using the OSD Fleet Manager api endpoint to deprovision the service cluster, and a default management cluster will be deprovision together.

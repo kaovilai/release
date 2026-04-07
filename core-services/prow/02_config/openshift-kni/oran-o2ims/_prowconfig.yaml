@@ -1,0 +1,3 @@
+tide:
+  merge_method:
+    openshift-kni/oran-o2ims: squash

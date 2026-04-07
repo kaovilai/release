@@ -44,7 +44,7 @@ subjects:
 # art_namespaces_rbac.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: release-controller-modify
@@ -82,6 +82,9 @@ rules:
   - list
   - watch
   - create
+  - delete
+  - update
+  - patch
 - apiGroups:
   - ''
   resources:
@@ -95,7 +98,7 @@ rules:
 # art_namespaces_rbac.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: release-controller-modify-ocp
@@ -118,7 +121,7 @@ rules:
 # art_namespaces_rbac.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: release-controller-modify-ocp
@@ -128,23 +131,37 @@ rules:
   - image.openshift.io
   resourceNames:
   - release
-  - '4.1'
   - '4.10'
   - '4.11'
   - '4.12'
   - '4.13'
   - '4.14'
-  - '4.2'
-  - '4.3'
-  - '4.4'
-  - '4.5'
+  - '4.15'
+  - '4.16'
+  - '4.17'
+  - '4.18'
+  - '4.19'
+  - '4.20'
+  - '4.21'
+  - '4.22'
+  - '4.23'
   - '4.6'
   - '4.7'
   - '4.8'
   - '4.9'
+  - '5.0'
   - scos-4.12
   - scos-4.13
   - scos-4.14
+  - scos-4.15
+  - scos-4.16
+  - scos-4.17
+  - scos-4.18
+  - scos-4.19
+  - scos-4.20
+  - scos-4.21
+  - scos-4.22
+  - scos-4.23
   resources:
   - imagestreams
   verbs:
@@ -162,12 +179,15 @@ rules:
   - list
   - watch
   - create
+  - delete
+  - update
+  - patch
 ---
 #---------------------------------------------------------------------------------
 # art_namespaces_rbac.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: release-controller-import-ocp
@@ -191,7 +211,7 @@ rules:
 # art_namespaces_rbac.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: release-controller-prowjob
@@ -382,4 +402,60 @@ kind: ServiceAccount
 metadata:
   annotations: {}
   name: release-controller-ocp
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: release-controller-ocp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: release-controller
+subjects:
+- kind: ServiceAccount
+  name: release-controller-ocp
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# release_payload_modifier_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-payload-modify
+  namespace: ocp
+rules:
+- apiGroups:
+  - release.openshift.io
+  resources:
+  - releasepayloads
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+#---------------------------------------------------------------------------------
+# release_payload_modifier_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-payload-modify-binding
+  namespace: ocp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-payload-modify
+subjects:
+- kind: ServiceAccount
+  name: release-payload-modifier
   namespace: ci

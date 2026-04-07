@@ -35,7 +35,7 @@ type: kubernetes.io/service-account-token
 # Allow ART to create buildconfigs to manifest ART equivalent images for upstream CI.
 # Also permit the creation of daemonsets to ensure kubelet does not gc builder images from nodes (bug
 # in 3.11).
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-manage-art-equivalent-buildconfigs
@@ -103,6 +103,81 @@ subjects:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
+# Allow ART to mirror images to the origin namespace so that OKD images can be provided
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: art-publish
+  namespace: origin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-builder
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: art-publish-modify-release
+  namespace: origin
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: art-publish-modify-release
+  namespace: origin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-modify-release
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
 # Allow ART to mirror images to the ocp-private namespace so 4.x:base images can be pushed
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -122,7 +197,7 @@ subjects:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -138,6 +213,12 @@ rules:
   - watch
   - update
   - patch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamimports
+  verbs:
+  - create
 - apiGroups:
   - image.openshift.io
   resources:
@@ -173,7 +254,7 @@ subjects:
 #---------------------------------------------------------------------------------
 
 # Allow ART to create prowjobs in the ci namespace for running upgrade tests
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-prowjob
@@ -215,7 +296,7 @@ subjects:
 #---------------------------------------------------------------------------------
 
 # Allow ART to patch releases (accept/reject) in the ocp namespace
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: art-publish-release-admin
@@ -267,26 +348,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest
-  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -395,7 +456,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -405,7 +466,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest
+  name: 4.15-art-latest
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -415,7 +476,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -425,7 +486,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest
+  name: 4.16-art-latest
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -435,7 +496,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -445,7 +506,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest
+  name: 4.17-art-latest
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -455,7 +516,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -465,7 +526,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest
+  name: 4.18-art-latest
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest
   namespace: ocp
 ---
 #---------------------------------------------------------------------------------
@@ -552,7 +713,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -571,6 +752,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -584,7 +771,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -661,26 +848,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-s390x
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-s390x
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-s390x
-  namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -789,7 +956,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -799,7 +966,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-s390x
+  name: 4.15-art-latest-s390x
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -809,7 +976,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -819,7 +986,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-s390x
+  name: 4.16-art-latest-s390x
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -829,7 +996,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -839,7 +1006,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-s390x
+  name: 4.17-art-latest-s390x
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -849,7 +1016,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -859,7 +1026,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-s390x
+  name: 4.18-art-latest-s390x
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-s390x
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-s390x
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-s390x
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-s390x
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-s390x
   namespace: ocp-s390x
 ---
 #---------------------------------------------------------------------------------
@@ -946,7 +1213,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-s390x
+  namespace: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -965,6 +1252,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -978,7 +1271,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -1055,26 +1348,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-ppc64le
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-ppc64le
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-ppc64le
-  namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -1183,7 +1456,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1193,7 +1466,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-ppc64le
+  name: 4.15-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1203,7 +1476,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1213,7 +1486,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-ppc64le
+  name: 4.16-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1223,7 +1496,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1233,7 +1506,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-ppc64le
+  name: 4.17-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1243,7 +1516,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1253,7 +1526,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-ppc64le
+  name: 4.18-art-latest-ppc64le
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-ppc64le
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-ppc64le
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-ppc64le
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-ppc64le
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
 #---------------------------------------------------------------------------------
@@ -1340,7 +1713,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-ppc64le
+  namespace: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -1359,6 +1752,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -1372,7 +1771,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -1449,26 +1848,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-arm64
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-arm64
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-arm64
-  namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -1577,7 +1956,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1587,7 +1966,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-arm64
+  name: 4.15-art-latest-arm64
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1597,7 +1976,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1607,7 +1986,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-arm64
+  name: 4.16-art-latest-arm64
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1617,7 +1996,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1627,7 +2006,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-arm64
+  name: 4.17-art-latest-arm64
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1637,7 +2016,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1647,7 +2026,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-arm64
+  name: 4.18-art-latest-arm64
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-arm64
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-arm64
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-arm64
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-arm64
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-arm64
   namespace: ocp-arm64
 ---
 #---------------------------------------------------------------------------------
@@ -1734,7 +2213,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-arm64
+  namespace: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -1753,6 +2252,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -1766,7 +2271,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -1843,26 +2348,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-multi
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-multi
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-multi
-  namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -1971,7 +2456,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -1981,7 +2466,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-multi
+  name: 4.15-art-latest-multi
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -1991,7 +2476,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -2001,7 +2486,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-multi
+  name: 4.16-art-latest-multi
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -2011,7 +2496,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -2021,7 +2506,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-multi
+  name: 4.17-art-latest-multi
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -2031,7 +2516,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -2041,7 +2526,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-multi
+  name: 4.18-art-latest-multi
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-multi
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-multi
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-multi
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-multi
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-multi
   namespace: ocp-multi
 ---
 #---------------------------------------------------------------------------------
@@ -2128,7 +2713,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-multi
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -2147,6 +2752,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -2160,7 +2771,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -2237,26 +2848,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-priv
-  namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -2365,7 +2956,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2375,7 +2966,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-priv
+  name: 4.15-art-latest-priv
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2385,7 +2976,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2395,7 +2986,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-priv
+  name: 4.16-art-latest-priv
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2405,7 +2996,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2415,7 +3006,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-priv
+  name: 4.17-art-latest-priv
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2425,7 +3016,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2435,7 +3026,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-priv
+  name: 4.18-art-latest-priv
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-priv
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-priv
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-priv
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-priv
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-priv
   namespace: ocp-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2522,7 +3213,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-priv
+  namespace: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -2541,6 +3252,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -2554,7 +3271,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -2631,26 +3348,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-s390x-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-s390x-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-s390x-priv
-  namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -2759,7 +3456,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2769,7 +3466,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-s390x-priv
+  name: 4.15-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2779,7 +3476,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2789,7 +3486,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-s390x-priv
+  name: 4.16-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2799,7 +3496,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2809,7 +3506,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-s390x-priv
+  name: 4.17-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2819,7 +3516,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2829,7 +3526,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-s390x-priv
+  name: 4.18-art-latest-s390x-priv
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-s390x-priv
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-s390x-priv
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-s390x-priv
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-s390x-priv
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
@@ -2916,7 +3713,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-s390x-priv
+  namespace: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -2935,6 +3752,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -2948,7 +3771,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -3025,26 +3848,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-ppc64le-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-ppc64le-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-ppc64le-priv
-  namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -3153,7 +3956,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3163,7 +3966,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-ppc64le-priv
+  name: 4.15-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3173,7 +3976,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3183,7 +3986,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-ppc64le-priv
+  name: 4.16-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3193,7 +3996,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3203,7 +4006,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-ppc64le-priv
+  name: 4.17-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3213,7 +4016,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3223,7 +4026,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-ppc64le-priv
+  name: 4.18-art-latest-ppc64le-priv
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-ppc64le-priv
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-ppc64le-priv
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-ppc64le-priv
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-ppc64le-priv
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3310,7 +4213,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-ppc64le-priv
+  namespace: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -3329,6 +4252,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -3342,7 +4271,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -3419,26 +4348,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-arm64-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-arm64-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-arm64-priv
-  namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -3547,7 +4456,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3557,7 +4466,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-arm64-priv
+  name: 4.15-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3567,7 +4476,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3577,7 +4486,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-arm64-priv
+  name: 4.16-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3587,7 +4496,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3597,7 +4506,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-arm64-priv
+  name: 4.17-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3607,7 +4516,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3617,7 +4526,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-arm64-priv
+  name: 4.18-art-latest-arm64-priv
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-arm64-priv
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-arm64-priv
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-arm64-priv
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-arm64-priv
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3704,7 +4713,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-arm64-priv
+  namespace: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -3723,6 +4752,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -3736,7 +4771,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph
@@ -3813,26 +4848,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ocp-multi-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: '4.1'
-  namespace: ocp-multi-priv
----
-#---------------------------------------------------------------------------------
-# art_publish_permissions.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: 4.1-art-latest-multi-priv
-  namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -3941,7 +4956,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.2'
+  name: '4.15'
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3951,7 +4966,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.2-art-latest-multi-priv
+  name: 4.15-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3961,7 +4976,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.3'
+  name: '4.16'
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3971,7 +4986,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.3-art-latest-multi-priv
+  name: 4.16-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3981,7 +4996,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.4'
+  name: '4.17'
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -3991,7 +5006,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.4-art-latest-multi-priv
+  name: 4.17-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -4001,7 +5016,7 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: '4.5'
+  name: '4.18'
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -4011,7 +5026,107 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: 4.5-art-latest-multi-priv
+  name: 4.18-art-latest-multi-priv
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.19'
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.19-art-latest-multi-priv
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.20'
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.20-art-latest-multi-priv
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.21'
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.21-art-latest-multi-priv
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.22'
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.22-art-latest-multi-priv
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '4.23'
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 4.23-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
 #---------------------------------------------------------------------------------
@@ -4098,7 +5213,27 @@ metadata:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: '5.0'
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: 5.0-art-latest-multi-priv
+  namespace: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-publish-modify-release
@@ -4117,6 +5252,12 @@ rules:
 - apiGroups:
   - image.openshift.io
   resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
   - imagestreamtags
   verbs:
   - get
@@ -4130,7 +5271,7 @@ rules:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: authorization.openshift.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: art-backup-upgrade-graph

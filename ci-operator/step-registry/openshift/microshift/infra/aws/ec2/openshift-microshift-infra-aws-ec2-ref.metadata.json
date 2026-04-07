@@ -1,0 +1,11 @@
+{
+	"path": "openshift/microshift/infra/aws/ec2/openshift-microshift-infra-aws-ec2-ref.yaml",
+	"owners": {
+		"approvers": [
+			"microshift-approvers"
+		],
+		"reviewers": [
+			"microshift-reviewers"
+		]
+	}
+}

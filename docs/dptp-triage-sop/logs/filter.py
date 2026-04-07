@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-import sys
-import os
 import json
+import sys
 
 data = {}
 
@@ -133,6 +132,8 @@ elif mode == "errors":
 
         # Looks temporary
         lambda message: matches(message, "pod-scaler", error="server_error: server error: 504"),
+        # Expected
+        lambda message: matches(message, "pod-scaler", msg="Kubeconfig changed, exiting to get restarted by Kubelet and pick up the changes"),
 
         # This is due to rate limiting: DPTP-2449
         lambda message: "hook" in message.get("component", "") and
@@ -146,16 +147,28 @@ elif mode == "errors":
 
         # Dummy PRPQR errors, we will see it until DPTP-2577
         lambda message: matches(message, "prow-controller-manager", msg='error executing URL template: template: JobURL:1:287: executing "JobURL" at <.Spec.Refs.Repo>: nil pointer evaluating *v1.Refs.Repo'),
+
+        lambda message: matches(message, "pj-rehearse", msg="couldn't prepare candidate"),
+        lambda message: matches(message, "pj-rehearse", error="failed waiting for prowjobs to finish: timed out waiting for the condition"),
+
+        lambda message: matches(message, "boskos", msg="Acquire failed"),
+
+        # DPTP-3925
+        lambda message: matches(message, "crier", error="failed to report job: error setting status: Unknown prowjob state: scheduling"),
+        lambda message: matches(message, "crier", error="error setting status: Unknown prowjob state: scheduling"),
         ]
 
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)
 
 def matches(message, component, *args, **kwargs):
-    if not component in message.get("component", ""):
+    structured = message.get("structured", "")
+    if not isinstance(structured, dict):
+        return False
+    if not component in structured.get("component", ""):
         return False
     for field, symptom in kwargs.items():
-        if not symptom in message.get(field, ""):
+        if not symptom in structured.get(field, ""):
             return False
     return True
 

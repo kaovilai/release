@@ -1,0 +1,21 @@
+{
+	"path": "hypershift/kubevirt/baremetalds/disconnected/conformance/hypershift-kubevirt-baremetalds-disconnected-conformance-workflow.yaml",
+	"owners": {
+		"approvers": [
+			"csrwng",
+			"enxebre",
+			"sjenning",
+			"LiangquanLi930",
+			"orenc1",
+			"tiraboschi"
+		],
+		"reviewers": [
+			"csrwng",
+			"enxebre",
+			"sjenning",
+			"LiangquanLi930",
+			"orenc1",
+			"tiraboschi"
+		]
+	}
+}

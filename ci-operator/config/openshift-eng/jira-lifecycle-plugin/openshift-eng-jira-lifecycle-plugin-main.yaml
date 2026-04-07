@@ -5,23 +5,38 @@ base_images:
     tag: latest
   os:
     name: centos
-    namespace: origin
-    tag: stream8
+    namespace: openshift
+    tag: stream9
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
-  to: jira-lifecycle-plugin
+  items:
+  - dockerfile_path: images/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
+    to: jira-lifecycle-plugin
+  - dockerfile_literal: |-
+      FROM pipeline:govulncheck
+      COPY jira-lifecycle-plugin /workdir
+      WORKDIR /workdir
+    from: govulncheck
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin
+    to: govulncheck-src
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - excluded_images:
+    - govulncheck-src
+    namespace: ci
+    tag: latest
 resources:
   '*':
     limits:
@@ -39,10 +54,23 @@ tests:
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
-  container:
-    from: govulncheck
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 500m
+          memory: 5Gi
+- as: security
   optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift-eng/jira-lifecycle-plugin
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift-eng

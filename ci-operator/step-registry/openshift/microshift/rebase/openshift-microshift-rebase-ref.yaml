@@ -1,9 +1,12 @@
 ref:
   as: openshift-microshift-rebase
-  from: rebase-payload
+  from: src
   cli: latest
   grace_period: 30m
   commands: openshift-microshift-rebase-commands.sh
+  env:
+  - name: DRY_RUN
+    default: ""
   dependencies:
   - name: "release:nightly-amd64"
     env: "OPENSHIFT_RELEASE_IMAGE"
@@ -14,9 +17,9 @@ ref:
       cpu: 800m
       memory: 1800Mi
   credentials:
-    - name: pull-secret
+    - name: ci-pull-credentials
       namespace: test-credentials
-      mount_path: /secrets/ci-pull-secret
+      mount_path: /secrets/import-secret
     - name: pr-creds
       namespace: test-credentials
       mount_path: /secrets/pr-creds

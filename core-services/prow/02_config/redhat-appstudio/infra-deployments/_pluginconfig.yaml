@@ -28,17 +28,21 @@ external_plugins:
     events:
     - issue_comment
     name: payload-testing-prow-plugin
-  - endpoint: http://jira-lifecycle-plugin
-    events:
-    - issue_comment
-    - pull_request
-    name: jira-lifecycle-plugin
+label:
+  restricted_labels:
+    redhat-appstudio/infra-deployments:
+    - allowed_teams:
+      - redhat-appstudio/production-approvers
+      label: infra/hold-production
+lgtm:
+- repos:
+  - redhat-appstudio/infra-deployments
+  review_acts_as_lgtm: true
 plugins:
   redhat-appstudio/infra-deployments:
     plugins:
     - assign
     - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
@@ -67,3 +71,6 @@ triggers:
   - redhat-appstudio/infra-deployments
   trusted_apps:
   - infra-deployments-updater
+  - rh-tap-build-team
+  - ec-automation
+  - openshift-merge-bot

@@ -5,26 +5,16 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- andfasano
-- bfournie
 - dtantsur
-- hardys
+- elfosardo
 - honza
-- mhrivnak
-- russellb
-- sadasu
 - zaneb
 options: {}
 reviewers:
-- andfasano
-- ardaguclu
-- bfournie
-- dhellmann
+- derekhiggins
 - dtantsur
 - elfosardo
-- hardys
 - honza
-- mhrivnak
-- russellb
-- sadasu
+- hroyrh
+- iurygregory
 - zaneb

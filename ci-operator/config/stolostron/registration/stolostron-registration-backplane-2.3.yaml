@@ -14,16 +14,18 @@ build_root:
     namespace: stolostron
     tag: go1.19-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.19-linux:
-      as:
-      - golang:1.19
-  to: registration
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      stolostron_builder_go1.19-linux:
+        as:
+        - golang:1.19
+    to: registration
 promotion:
-  name: "2.3"
-  namespace: stolostron
+  to:
+  - name: "2.3"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -50,6 +52,7 @@ tests:
     from: bin
 - as: verify
   commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
     make verify -k --warn-undefined-variables
   container:
     from: bin
@@ -67,24 +70,6 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        export KUBECTL
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: registration
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: publish
   postsubmit: true
   steps:

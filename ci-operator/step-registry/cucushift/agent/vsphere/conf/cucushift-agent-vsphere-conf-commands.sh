@@ -16,33 +16,71 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-[ -z "${WORKERS}" ] && { echo "\$WORKERS is not filled. Failing."; exit 1; }
-[ -z "${MASTERS}" ] && { echo "\$MASTERS is not filled. Failing."; exit 1; }
-
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+[ -z "${WORKERS}" ] && {
+  echo "\$WORKERS is not filled. Failing."
+  exit 1
+}
+[ -z "${MASTERS}" ] && {
+  echo "\$MASTERS is not filled. Failing."
+  exit 1
+}
 
 export HOME=/tmp
 
-pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build01_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build01_auth=$(jq -c '.auths."registry.apps.build01-us-west-2.vmc.ci.openshift.org"' ${build01_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build01_auth" '.auths["registry.apps.build01-us-west-2.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
-echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
+declare vlanid
+declare primaryrouterhostname
+declare vsphere_portgroup
+source "${SHARED_DIR}/vsphere_context.sh"
+source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
+declare vsphere_url
+declare GOVC_USERNAME
+declare GOVC_PASSWORD
+declare vsphere_datacenter
+declare vsphere_datastore
+declare dns_server
+declare vsphere_cluster
+
+machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
+fi
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
+cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
+machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
+
+echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
+
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+pull_secret_path=/tmp/pull-secret
+
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create base-domain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
 base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
-
-machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-
-pull_secret=$(<"${SHARED_DIR}/pull-secrets")
+pull_secret=$(jq -c . < "$pull_secret_path")
 
 # Create cluster-name.txt
-echo "${NAMESPACE}-${JOB_NAME_HASH}" >"${SHARED_DIR}"/cluster-name.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
-# Add build01 secrets if the mirror registry secrets are not available.
+# Add build02 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
   yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
   cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
@@ -50,26 +88,53 @@ pullSecret: >
   ${pull_secret}
 EOF
 fi
-# Load array created in setup-vips:
-# 0: API
-# 1: Ingress
-declare -a vips
-mapfile -t vips <"${SHARED_DIR}"/vips.txt
+echo "Installing from initial release $RELEASE_IMAGE_LATEST"
+oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
+  --command=openshift-install --to=/tmp
+rm ${pull_secret_path}
+version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
+# Add vSphere credentials if the version is 4.15 or more
+if [[ "${version}" -ge "415" ]]; then
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
+platform:
+  vsphere:
+    failureDomains:
+    - name: test-failure-baseDomain
+      region: changeme-region
+      server: ${vsphere_url}
+      topology:
+        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
+        datacenter: ${vsphere_datacenter}
+        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+        networks:
+        - ${vsphere_portgroup}
+        resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources
+        folder: /${vsphere_datacenter}/vm/${cluster_name}
+      zone: changeme-zone
+    vcenters:
+    - datacenters:
+      - ${vsphere_datacenter}
+      server: ${vsphere_url}
+      password: ${GOVC_PASSWORD}
+      user: ${GOVC_USERNAME}
+"
+fi
 
 if [ "${MASTERS}" -eq 1 ]; then
+  yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
 platform:
   none: {}
 "
-else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
-platform:
-  vsphere:
-    apiVIPs:
-    - ${vips[0]}
-    ingressVIPs:
-    - ${vips[1]}
-"
+fi
+
+if [[ ${IP_FAMILIES} == "IPv4" ]]; then
+  yq e --inplace 'del(.networking)' "${SHARED_DIR}"/install-config.yaml
+  cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
+networking:
+  machineNetwork:
+  - cidr: ${machine_cidr}
+EOF
 fi
 
 cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
@@ -80,9 +145,6 @@ controlPlane:
 compute:
 - name: worker
   replicas: ${WORKERS}
-networking:
-  machineNetwork:
-  - cidr: ${machine_cidr}
 EOF
 
 # Create cluster-domain.txt
@@ -98,13 +160,6 @@ echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_vers
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 echo "export target_hw_version=${target_hw_version}" >>"${SHARED_DIR}"/vsphere_context.sh
-declare vsphere_url
-declare GOVC_USERNAME
-declare GOVC_PASSWORD
-declare vsphere_datacenter
-declare vsphere_datastore
-declare dns_server
-source "${SHARED_DIR}/vsphere_context.sh"
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses=()
@@ -115,20 +170,51 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/mac-addresses.txt
 
 declare -a hostnames=()
-for ((i = 0; i < total_host; i++)); do
-  if [ "${WORKERS}" -gt 0 ]; then
-    hostnames+=("${cluster_name}-master-$i")
-    hostnames+=("${cluster_name}-worker-$i")
-    echo "${hostnames[$i]}"
-  else
-    hostnames+=("${cluster_name}-master-$i")
-    echo "${hostnames[$i]}"
-  fi
-done >"${SHARED_DIR}"/hostnames.txt
+for ((i = 0; i < MASTERS; i++)); do
+  hostname="${cluster_name}-master-$i"
+  echo "$hostname" >>"${SHARED_DIR}"/hostnames.txt
+  hostnames+=("${hostname}")
+done
+
+for ((i = 0; i < WORKERS; i++)); do
+  hostname="${cluster_name}-worker-$i"
+  echo "$hostname" >>"${SHARED_DIR}"/hostnames.txt
+  hostnames+=("${hostname}")
+done
 
 for ((i = 0; i < total_host; i++)); do
+  ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+  ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
+
+  ipv4="
+        ipv4:
+          enabled: true
+          address:
+            - ip: ${ipaddress}
+              prefix-length: ${cidr}
+          dhcp: false"
+  ipv6="
+        ipv6:
+          enabled: true
+          address:
+            - ip: "${ipv6_address%%::*}::"$((i + 6))
+              prefix-length: ${cidr_ipv6}
+          dhcp: false"
+  route_ipv4="
+          - destination: 0.0.0.0/0
+            next-hop-address: ${gateway}
+            next-hop-interface: ens32
+            table-id: 254"
+  route_ipv6="
+          - destination: ::/0
+            next-hop-address: ${gateway_ipv6}
+            next-hop-interface: ens32
+            table-id: 254"
+  # Single-stack override conditions
+  if [[ ${IP_FAMILIES} == "IPv4" ]]; then ipv6=""; route_ipv6=""; fi
+  if [[ ${IP_FAMILIES} == "IPv6" ]]; then ipv4=""; route_ipv4=""; fi
   echo " - hostname: ${hostnames[$i]}
-   role: $(echo "${hostnames[$i]}"|rev|cut -d'-' -f2|rev|cut -f1)
+   role: $(echo "${hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
    interfaces:
     - name: ens32
       macAddress: ${mac_addresses[$i]}
@@ -137,23 +223,13 @@ for ((i = 0; i < total_host; i++)); do
       - name: ens32
         type: ethernet
         state: up
-        mac-address: ${mac_addresses[$i]}
-        ipv4:
-          enabled: true
-          address:
-            - ip: 192.168.${third_octet}.$((i + 4))
-              prefix-length: 25
-          dhcp: false
+        mac-address: ${mac_addresses[$i]}${ipv4}${ipv6}
     dns-resolver:
      config:
       server:
        - ${dns_server}
     routes:
-     config:
-       - destination: 0.0.0.0/0
-         next-hop-address: 192.168.${third_octet}.1
-         next-hop-interface: ens32
-         table-id: 254"
+     config:${route_ipv4}${route_ipv6}"
 done >>"${SHARED_DIR}/agent-config.yaml.patch"
 
 agent_config_patch="${SHARED_DIR}/agent-config.yaml.patch"
@@ -161,7 +237,7 @@ agent_config_patch="${SHARED_DIR}/agent-config.yaml.patch"
 cat >"${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1alpha1
 kind: AgentConfig
-rendezvousIP: 192.168.${third_octet}.4
+rendezvousIP: ${rendezvous_ip_address}
 hosts: []
 EOF
 
@@ -170,65 +246,23 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
-  --command=openshift-install --to=/tmp
-
-dir=/tmp/installer
-mkdir "${dir}/"
-pushd ${dir}
-cp -t "${dir}" \
-  "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
-
-echo "Creating agent image..."
-/tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
-
-if ! wait $!; then
-  cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
-  exit 1
+if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
+  cat >> "${SHARED_DIR}/agent-config.yaml" <<EOF
+minimalISO: ${MINIMAL_ISO}
+EOF
 fi
 
-curl -s -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o ${HOME}/glx.tar.gz && tar -C ${HOME} -xvf ${HOME}/glx.tar.gz govc && rm -f ${HOME}/glx.tar.gz
-
-source "${SHARED_DIR}/govc.sh"
-
-echo "agent.x86_64_${cluster_name}.iso" >"${SHARED_DIR}"/agent-iso.txt
-agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
-echo "uploading ${agent_iso} to iso-datastore.."
-
-for ((i = 0; i < 3; i++)); do
-  /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" &
-  result=$?
-  if [[ $result -eq 0 ]]; then
-    echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
-    break
-  else
-    echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
-    sleep 2
-  fi
-done
-if [[ $result -ne 0 ]]; then
-  echo "Agent ISO upload failed after 3 attempts!!!"
-fi
-
-/tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" &
-if ! wait $!; then
-  echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso!"
-  exit 1
-fi
+grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for post installation..."
-cat >> "${SHARED_DIR}/platform-conf.sh" << EOF
+cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
 export VSPHERE_USERNAME="${GOVC_USERNAME}"
 export VSPHERE_VCENTER="${vsphere_url}"
 export VSPHERE_DATACENTER="${vsphere_datacenter}"
+export VSPHERE_CLUSTER="${vsphere_cluster}"
 export VSPHERE_DATASTORE="${vsphere_datastore}"
 export VSPHERE_PASSWORD='${GOVC_PASSWORD}'
+export VSPHERE_NETWORK='${vsphere_portgroup}'
+export VSPHERE_FOLDER="${cluster_name}"
 EOF
-
-echo "Copying kubeconfig to the shared directory..."
-cp -t "${SHARED_DIR}" \
-  "${dir}/auth/kubeadmin-password" \
-  "${dir}/auth/kubeconfig" \
-  "${dir}/.openshift_install_state.json"
-popd

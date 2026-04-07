@@ -6,28 +6,27 @@
 
 approvers:
 - bertinatto
-- dulek
+- damdo
+- dobsonj
 - elmiko
-- emilienm
-- enxebre
+- eshulman2
 - gnufied
 - gryf
-- huffmanca
 - joelspeed
 - jsafrane
 - mandre
-- maysamacedo
 - mdbooth
-- pierreprinetti
+- mpatlasov
+- nrb
+- racheljpg
+- radekmanak
+- romanbednar
 - stephenfin
+- theobarberbany
 - tsmetana
 options: {}
 reviewers:
-- dulek
-- emilienm
+- eshulman2
 - gryf
 - mandre
-- maysamacedo
-- mdbooth
-- pierreprinetti
 - stephenfin

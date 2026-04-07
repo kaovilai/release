@@ -1,32 +1,43 @@
 base_images:
-  centos:
-    name: stream9
-    namespace: coreos
-    tag: "9"
+  origin_scos-4.22_base-stream9:
+    name: scos-4.22
+    namespace: origin
+    tag: base-stream9
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
 images:
-- dockerfile_path: Dockerfile.okd
-  from: centos
-  to: ironic-agent
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.okd
+    from: origin_scos-4.22_base-stream9
+    to: ironic-agent
 promotion:
-  name: scos-4.14
-  namespace: origin
+  to:
+  - name: scos-4.22
+    namespace: origin
 releases:
-  initial:
-    integration:
-      name: scos-4.14
-      namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: scos-4.14
+      name: scos-4.22
       namespace: origin
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift

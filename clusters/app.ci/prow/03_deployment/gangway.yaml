@@ -1,5 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: gangway
+  namespace: openshift
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -19,7 +22,7 @@ objects:
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
-      termination: Reencrypt
+      termination: reencrypt
     to:
       kind: Service
       name: gangway
@@ -54,6 +57,11 @@ objects:
     labels:
       app: prow
       component: gangway
+    annotations:
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
   spec:
     replicas: 1
     selector:
@@ -67,38 +75,24 @@ objects:
           component: gangway
       spec:
         serviceAccountName: gangway
-        containers:
-        - name: oauth-proxy
-          image: quay.io/openshift/origin-oauth-proxy:4.9
-          imagePullPolicy: IfNotPresent
-          ports:
-          - containerPort: 8443
-            name: web
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
           args:
-          - -provider=openshift
-          - -https-address=:8443
-          - -http-address=
-          - -email-domain=*
-          - -upstream=http://localhost:32001
-          - -client-id=system:serviceaccount:ci:gangway
-          - -openshift-ca=/etc/pki/tls/cert.pem
-          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
-          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
-          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -cookie-secret-file=/etc/proxy/secrets/session_secret
-          - -cookie-samesite=none
-          - -tls-cert=/etc/tls/private/tls.crt
-          - -tls-key=/etc/tls/private/tls.key
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
-          - mountPath: /etc/tls/private
-            name: gangway-tls
-          - mountPath: /etc/proxy/secrets
-            name: session-secret
-        - name: envoyproxy
-          image: registry.ci.openshift.org/ci/envoyproxy:latest
+          - name: release
+            mountPath: /tmp/git-sync
+        containers:
         - name: gangway
-          image: gcr.io/k8s-prow/gangway:v20230405-46d7922c2a
+          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20260328-dc2bbc9fc
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -107,7 +101,7 @@ objects:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --grace-period=110s
           - --dry-run=false
           env:
@@ -129,13 +123,13 @@ objects:
             httpGet:
               path: /healthz
               port: 8081
-            initialDelaySeconds: 10
+            initialDelaySeconds: 90
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthz/ready
               port: 8081
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 600
           volumeMounts:
@@ -149,13 +143,68 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           resources:
             requests:
-              memory: "2Gi"
+              memory: "5Gi"
               cpu: "1"
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:31999
+          - -client-id=system:serviceaccount:ci:gangway
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar=[{"resource": "namespaces", "verb": "get"},{"resource": "systemusers", "verb": "impersonate"}]'
+          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}, "/bulk-job-status-update": {"resource": "systemusers", "verb": "impersonate"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: gangway-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - name: envoyproxy
+          imagePullPolicy: Always
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_tp-envoyproxy_latest
+        - name: nginx-rate-limit
+          imagePullPolicy: Always
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_nging-rate-limit_latest
+          volumeMounts:
+          - mountPath: /var/cache/nginx
+            name: nginx-cache
+          - mountPath: /tmp
+            name: nginx-tmp
         volumes:
         - name: github-app-credentials
           secret:
@@ -174,53 +223,13 @@ objects:
         - name: gangway-tls
           secret:
             secretName: gangway-tls
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-tmp
+          emptyDir: {}
+
 - apiVersion: v1
   kind: Secret
   metadata:
@@ -250,4 +259,61 @@ objects:
   subjects:
   - apiGroup: rbac.authorization.k8s.io
     kind: Group
+    name: aos-qe
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
     name: msi-qe
+  - kind: ServiceAccount
+    namespace: cspi-qe
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: rhtap-qe
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aos-qe
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: hypershift-qe
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: ocpci-lp-interop
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: cnv-qe
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: konflux-tp
+    name: gangway-token
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: cert-manager-operator-dev
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
+  - kind: ServiceAccount
+    namespace: ocp-qe-logging-team
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: telcov10n-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: oadp-dev
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aro-hcp-prow-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aro-classic-prow-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: ocp-isc-qe-team
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: osc-prow
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: ocp-errata-reliability-team
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: quaykonflux
+    name: periodic-job-bot

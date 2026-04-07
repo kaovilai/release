@@ -11,3 +11,9 @@ plugins:
   openshift/openstack-ironic-python-agent:
     plugins:
     - approve
+triggers:
+- repos:
+  - openshift/openstack-ironic-python-agent
+  trusted_apps:
+  - ironic-merge-bot
+  - openshift-merge-bot

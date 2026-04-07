@@ -1,0 +1,1 @@
+registry.ci.openshift.org/origin/scos-4.19:ovirt-machine-controllers quay.io/openshift/origin-ovirt-machine-controllers:4.19 quay.io/openshift/origin-ovirt-machine-controllers:4.19.0

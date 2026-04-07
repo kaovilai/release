@@ -5,7 +5,15 @@ branch-protection:
         governance-policy-framework:
           branches:
             main:
-              enforce_admins: true
+              protect: true
+              required_pull_request_reviews:
+                dismiss_stale_reviews: true
+                required_approving_review_count: 1
+              required_status_checks:
+                contexts:
+                - Framework KinD / Tests (latest, deployOnHub)
+                - Framework KinD / Tests (latest)
+            release-2.11:
               protect: true
               required_pull_request_reviews:
                 dismiss_stale_reviews: true
@@ -14,25 +22,7 @@ branch-protection:
                 contexts:
                 - Framework KinD / Tests (latest, true)
                 - Framework KinD / Tests (latest, false)
-            release-2.3:
-              protect: true
-              required_pull_request_reviews:
-                dismiss_stale_reviews: true
-                required_approving_review_count: 1
-              required_status_checks:
-                contexts:
-                - Travis CI - Pull Request
-            release-2.4:
-              protect: true
-              required_pull_request_reviews:
-                dismiss_stale_reviews: true
-                required_approving_review_count: 1
-            release-2.5:
-              protect: true
-              required_pull_request_reviews:
-                dismiss_stale_reviews: true
-                required_approving_review_count: 1
-            release-2.6:
+            release-2.12:
               protect: true
               required_pull_request_reviews:
                 dismiss_stale_reviews: true
@@ -41,7 +31,7 @@ branch-protection:
                 contexts:
                 - Framework KinD / Tests (latest, true)
                 - Framework KinD / Tests (latest, false)
-            release-2.7:
+            release-2.13:
               protect: true
               required_pull_request_reviews:
                 dismiss_stale_reviews: true
@@ -50,7 +40,7 @@ branch-protection:
                 contexts:
                 - Framework KinD / Tests (latest, true)
                 - Framework KinD / Tests (latest, false)
-            release-2.8:
+            release-2.14:
               protect: true
               required_pull_request_reviews:
                 dismiss_stale_reviews: true
@@ -59,6 +49,33 @@ branch-protection:
                 contexts:
                 - Framework KinD / Tests (latest, true)
                 - Framework KinD / Tests (latest, false)
+            release-2.15:
+              protect: true
+              required_pull_request_reviews:
+                dismiss_stale_reviews: true
+                required_approving_review_count: 1
+              required_status_checks:
+                contexts:
+                - Framework KinD / Tests (latest, true)
+                - Framework KinD / Tests (latest, false)
+            release-2.16:
+              protect: true
+              required_pull_request_reviews:
+                dismiss_stale_reviews: true
+                required_approving_review_count: 1
+              required_status_checks:
+                contexts:
+                - Framework KinD / Tests (latest, true)
+                - Framework KinD / Tests (latest, false)
+            release-2.17:
+              protect: true
+              required_pull_request_reviews:
+                dismiss_stale_reviews: true
+                required_approving_review_count: 1
+              required_status_checks:
+                contexts:
+                - Framework KinD / Tests (latest, deployOnHub)
+                - Framework KinD / Tests (latest)
 tide:
   merge_method:
     stolostron/governance-policy-framework: rebase

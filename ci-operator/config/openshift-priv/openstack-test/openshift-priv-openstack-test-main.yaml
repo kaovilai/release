@@ -1,36 +1,24 @@
-base_images:
-  ocp_4.14_cli:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: cli
 binary_build_commands: go build -o /bin/openstack-tests ./cmd/openshift-tests
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  from_repository: true
+  use_build_cache: true
 canonical_go_repository: github.com/openshift/openstack-test
 images:
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.14:cli AS cli
-    FROM bin
-    COPY --from=cli /usr/bin/oc /bin/oc
-  from: bin
-  inputs:
-    ocp_4.14_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:cli
-  to: openstack-tests
+  items:
+  - dockerfile_literal: FROM bin
+    from: bin
+    to: openstack-tests
 promotion:
-  additional_images:
-    openstack-tests: bin
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      openstack-tests: bin
+    name: 4.22-priv
+    namespace: ocp-private
 releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -56,16 +44,40 @@ tests:
     test:
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
-- as: test-kuryr
+- always_run: false
+  as: e2e-openstack-ccpmso
+  optional: true
   steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
+    cluster_profile: openstack-vexxhost
     test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-openstack-dualstack
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-dualstack
+- always_run: false
+  as: e2e-openstack-dualstack-v6primary
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dualstack-v6primary
+    workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: main
   org: openshift-priv

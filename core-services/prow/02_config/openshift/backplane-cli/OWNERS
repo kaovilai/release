@@ -5,16 +5,26 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- cblecker
-- feichashao
-- jharrington22
-- supreeth7
-- wanghaoran1988
-options: {}
-reviewers:
+- bmeng
+- diakovnec
 - feichashao
 - mitalibhalla
-- reetika-vyas
-- supreeth7
-- tafhim
+- samanthajayasinghe
+- smarthall
+- typeid
 - wanghaoran1988
+- xiaoyu74
+options: {}
+reviewers:
+- a7vicky
+- bmeng
+- diakovnec
+- feichashao
+- mitalibhalla
+- samanthajayasinghe
+- smarthall
+- tafhim
+- tessg22
+- typeid
+- wanghaoran1988
+- xiaoyu74

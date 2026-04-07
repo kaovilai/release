@@ -7,10 +7,6 @@ base_images:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -18,9 +14,10 @@ build_root:
     namespace: stolostron
     tag: go1.18-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-templates-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-templates-operator
 operator:
   bundles:
   - as: cluster-templates-bundle
@@ -29,9 +26,10 @@ operator:
     dockerfile_path: bundle.Dockerfile
     update_graph: replaces
 promotion:
-  disabled: true
-  name: "2.8"
-  namespace: stolostron
+  to:
+  - disabled: true
+    name: "2.8"
+    namespace: stolostron
 resources:
   '*':
     limits:

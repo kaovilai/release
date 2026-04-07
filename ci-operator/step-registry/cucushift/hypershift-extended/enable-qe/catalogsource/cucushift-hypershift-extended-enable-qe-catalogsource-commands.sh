@@ -43,8 +43,15 @@ EOF
 
 function create_catalog_sources() {
     # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    kube_major=$(oc version -o json |jq -r '.serverVersion.major')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
+
+    if [ "${DISCONNECTED}" = "true" ]; then
+        index_image="$(sed 's/5000/6001/' "${SHARED_DIR}/mirror_registry_url")/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    else
+        index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    fi
+    index_image_repo="${index_image%:*}"
 
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
@@ -53,6 +60,8 @@ kind: CatalogSource
 metadata:
   name: qe-app-registry
   namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "${index_image_repo}:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   image: ${index_image}
@@ -89,6 +98,10 @@ EOF
     fi
     set -e
 }
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
   echo "SKIP ....."

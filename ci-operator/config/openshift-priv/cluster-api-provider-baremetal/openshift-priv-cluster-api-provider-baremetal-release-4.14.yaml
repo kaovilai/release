@@ -12,13 +12,14 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-api-provider-baremetal
 images:
-- dockerfile_path: Dockerfile.rhel
-  from: base
-  to: baremetal-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    from: base
+    to: baremetal-machine-controllers
 promotion:
-  disabled: true
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - name: 4.14-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -40,23 +41,26 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
-- as: e2e-metal-ipi
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-upgrade
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-upgrade
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -66,18 +70,20 @@ tests:
       RUN_UPGRADE_TEST: "true"
       TEST_SUITE: ""
       TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade
-- as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+    workflow: baremetalds-e2e-upgrade-sdn
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia

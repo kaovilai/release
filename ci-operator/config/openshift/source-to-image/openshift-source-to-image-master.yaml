@@ -1,9 +1,9 @@
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
 resources:
   '*':
     requests:
@@ -29,6 +29,12 @@ tests:
   container:
     from: bin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: source-to-image
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

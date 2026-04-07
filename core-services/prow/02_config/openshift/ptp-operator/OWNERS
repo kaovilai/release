@@ -6,30 +6,16 @@
 
 approvers:
 - aneeshkp
-- dcbw
-- dougbtv
-- fedepaol
-- fepan
 - josephdrichard
 - jzding
-- nishant-parekh
-- oribon
-- pliurh
-- s1061123
-- schseba
-- zshi-redhat
+- lack
+- nocturnalastro
+- vitus133
 options: {}
 reviewers:
 - aneeshkp
-- dcbw
-- dougbtv
-- fedepaol
-- fepan
 - josephdrichard
 - jzding
-- nishant-parekh
-- oribon
-- pliurh
-- s1061123
-- schseba
-- zshi-redhat
+- lack
+- nocturnalastro
+- vitus133

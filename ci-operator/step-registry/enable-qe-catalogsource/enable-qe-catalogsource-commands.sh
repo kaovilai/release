@@ -54,17 +54,36 @@ function update_global_auth () {
   # replace all global auth with the QE's
   # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
 
-  # only add quay.io/openshift-qe-optional-operators auth to the global auth
+  # add quay.io/openshift-qe-optional-operators and quay.io/openshifttest auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
   # qe_registry_auth=$(cat "/var/run/vault/mirror-registry/qe_optional.json" | jq -r '.auths."quay.io/openshift-qe-optional-operators".auth')
   optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
   optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
   qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
+  openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+  openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+  openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+
+  stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
+  stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
+  stage_registry_auth=`echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0`
+
   reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
   reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
   brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-  jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  
+  # Merge konflux operator art image share credentials if available
+  konflux_dockerconfig="/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson"
+  if [[ -f "${konflux_dockerconfig}" ]]; then
+    echo "Merging konflux operator art image share credentials..."
+    # Extract auths from konflux dockerconfig and merge with other auths
+    konflux_auths=$(cat "${konflux_dockerconfig}" | jq -r '.auths')
+    jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" --argjson konflux "$konflux_auths" '.auths |= . + $a + $konflux' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  else
+    echo "Konflux credentials not found at ${konflux_dockerconfig}, skipping..."
+    jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  fi
 
  # run_command "cat ${new_dockerconfig} | jq"
 
@@ -90,7 +109,7 @@ function update_global_auth () {
 
 # create ICSP for connected env.
 function create_icsp_connected () {
-    cat <<EOF | oc create -f -
+    cat <<EOF | oc apply -f -
     apiVersion: operator.openshift.io/v1alpha1
     kind: ImageContentSourcePolicy
     metadata:
@@ -118,16 +137,48 @@ EOF
 function create_catalog_sources()
 {
     # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    kube_major=$(oc version -o json |jq -r '.serverVersion.major')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
+    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
-    echo "create QE catalogsource: qe-app-registry"
-    cat <<EOF | oc create -f -
+    echo "Create QE catalogsource: $CATALOGSOURCE_NAME"
+    echo "Use $index_image in catalogsource/$CATALOGSOURCE_NAME"
+    # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
+    # details: https://issues.redhat.com/browse/OCPBUGS-31427
+    if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
+        echo "the index image as the initContainer cache image)" 
+        cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: qe-app-registry
+  name: $CATALOGSOURCE_NAME
   namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
+spec:
+  displayName: Production Operators
+  grpcPodConfig:
+    extractContent:
+      cacheDir: /tmp/cache
+      catalogDir: /configs
+    memoryTarget: 30Mi
+  image: ${index_image}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+    else
+        echo "the index image as the server image" 
+        cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOGSOURCE_NAME
+  namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   image: ${index_image}
@@ -137,6 +188,8 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+    fi
+
     set +e 
     COUNTER=0
     while [ $COUNTER -lt 600 ]
@@ -144,7 +197,7 @@ EOF
         sleep 20
         COUNTER=`expr $COUNTER + 20`
         echo "waiting ${COUNTER}s"
-        STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        STATUS=`oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o=jsonpath="{.status.connectionState.lastObservedState}"`
         if [[ $STATUS = "READY" ]]; then
             echo "create the QE CatalogSource successfully"
             break
@@ -158,9 +211,9 @@ EOF
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
         
         run_command "oc get pods -o wide -n openshift-marketplace"
-        run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
-        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
-        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
+        run_command "oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o yaml"
+        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o yaml"
+        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o=jsonpath='{.items[0].spec.nodeName}')
         run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
         run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${index_image}"
         
@@ -204,14 +257,31 @@ EOF
 
 }
 
+# from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+# since OCP4.18, OLMv1 is a new capability: OperatorLifecycleManagerV1
+function check_olm_capability(){
+    # check if OLMv0 capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager\"," ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManagerv0"
+        # check if OLMv0 capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager\"," ]]; then
+              echo "OperatorLifecycleManagerv0 capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
 run_command "oc whoami"
-run_command "oc version -o yaml"
+run_command "which oc && oc version -o yaml"
 update_global_auth
 sleep 5
 create_icsp_connected
+check_olm_capability
 check_marketplace
 create_catalog_sources
 
 #support hypershift config guest cluster's icsp
-oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_iscp.yaml && yq-go r /tmp/mgmt_iscp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_iscp.yaml
+oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml

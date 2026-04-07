@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
     openshift.io/description: Automation ServiceAccounts for CNF QE
     openshift.io/display-name: CNF QE
   name: cnf-qe
@@ -38,5 +39,5 @@ roleRef:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: cnf-qe-admins
+    name: cnf-qe
     namespace: cnf-qe

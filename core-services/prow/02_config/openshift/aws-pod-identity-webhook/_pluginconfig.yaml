@@ -3,13 +3,17 @@ label:
     openshift/aws-pod-identity-webhook:
     - allowed_users:
       - 2uasimojo
-      - abutcher
-      - suhanime
       - dlom
+      - jstuever
+      - lleshchi
+      - suhanime
       label: backport-risk-assessed
     - allowed_users:
       - lwan-wanglin
       - jianping-shu
+      - huangmingxia
+      assign_on:
+      - label: backport-risk-assessed
       label: cherry-pick-approved
 plugins:
   openshift/aws-pod-identity-webhook:

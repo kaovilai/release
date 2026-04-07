@@ -12,8 +12,9 @@
 
 ## Purpose
 
-Use to execute the `Java` [strimzi/strimzi-kafka-operator](https://github.com/strimzi/strimzi-kafka-operator) using the provided arguments. 
-All XML results will be copied into `$ARTIFACT_DIR/junit_*.xml`.
+Use to execute the `Java` [strimzi/strimzi-kafka-operator](https://github.com/strimzi/strimzi-kafka-operator) using the provided arguments.
+All XML results will be copied into `$ARTIFACT_DIR/xunit/junit_*.xml`.
+All logs could be found at `$ARTIFACT_DIR/logs/`.
 
 ## Process
 
@@ -26,7 +27,7 @@ mvn verify -pl systemtest -P all \
 	-Dmaven.javadoc.skip=true \
 	-Dfailsafe.rerunFailingTestsCount=1
 ```
-2. Copies the XML files from result dir to `$ARTIFACT_DIR/junit_*.xml`.
+2. Copies the XML files from result dir to `$ARTIFACT_DIR/xunit/junit_*.xml`.
 
 ## Prerequisite(s)
 
@@ -51,7 +52,7 @@ mvn verify -pl systemtest -P all \
   - **If left empty**: It will use `redhat-operators` as default.
 - `OLM_APP_BUNDLE_PREFIX`
   - **Definition**: Specify operator app bundle prefix. This shouldn't be changed from default unless AMQ Streams operator will change the install policy or name.
-  - **If left empty**: It will use `amqstreams` as default.
+  - **If left empty**: It will use `amq-streams` as default.
 - `OLM_OPERATOR_DEPLOYMENT_NAME`
   - **Definition**: Specify operator deployment name. This shouldn't be changed from default unless AMQ Streams operator will change the install policy or name.
   - **If left empty**: It will use `amq-streams-cluster-operator` as default.

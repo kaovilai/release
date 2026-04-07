@@ -7,7 +7,7 @@ set -o pipefail
 
 function check_pod_status() {
     INTERVAL=60
-    CNT=10
+    CNT=15
     while [ $((CNT)) -gt 0 ]; do
         READY=false
         while read -r i
@@ -32,7 +32,7 @@ function check_pod_status() {
 
         if [[ $((CNT)) -eq 0 ]]; then
             echo "Pod $1 did not successfully deploy"
-            oc -n "${MAISTRA_NAMESPACE}" get pods "$1"
+            oc -n "${MAISTRA_NAMESPACE}" describe pods "$1"
             return 1
         fi
     done
@@ -75,21 +75,46 @@ spec:
         add: ["IPC_LOCK","SYS_ADMIN"]
       privileged: true
       runAsUser: 0
-    resources:
-      requests:
-        memory: 1Gi
-        cpu: '2'
-        ${RESOURCE_REQUEST:-}
-      limits:
-        memory: 1Gi
-        cpu: '2'
-        ${RESOURCE_REQUEST:-}
+    env:
+    - name: BUILD_WITH_CONTAINER
+      value: "${BUILD_WITH_CONTAINER:-}"
+    - name: INTEGRATION_TEST_FLAGS
+      value: "${INTEGRATION_TEST_FLAGS:-}"
+    - name: DOCKER_REGISTRY_MIRRORS
+      value: "${DOCKER_REGISTRY_MIRRORS:-}"
+    - name: CI
+      value: "${CI:-}"
+    - name: ARTIFACTS
+      value: "${ARTIFACT_DIR:-}"
+    - name: JOB_NAME
+      value: "${JOB_NAME:-}"
+    - name: JOB_TYPE
+      value: "${JOB_TYPE:-}"
+    - name: BUILD_ID
+      value: "${BUILD_ID:-}"
+    - name: PROW_JOB_ID
+      value: "${PROW_JOB_ID:-}"
+    - name: REPO_OWNER
+      value: "${REPO_OWNER:-}"
+    - name: REPO_NAME
+      value: "${REPO_NAME:-}"
+    - name: PULL_BASE_REF
+      value: "${PULL_BASE_REF:-}"
+    - name: PULL_BASE_SHA
+      value: "${PULL_BASE_SHA:-}"
+    - name: PULL_REFS
+      value: "${PULL_REFS:-}"
+    - name: PULL_NUMBER
+      value: "${PULL_NUMBER:-}"
+    - name: PULL_PULL_SHA
+      value: "${PULL_PULL_SHA:-}"
+    - name: PULL_HEAD_REF
+      value: "${PULL_HEAD_REF:-}"
+    - name: HUB
+      value: "${HUB:-}"
     volumeMounts:
     - mountPath: /lib/modules
       name: modules
-      readOnly: true
-    - mountPath: /sys/fs/cgroup
-      name: cgroup
       readOnly: true
     - mountPath: /var/lib/docker
       name: varlibdocker
@@ -99,19 +124,20 @@ spec:
       path: /lib/modules
       type: Directory
     name: modules
-  - hostPath:
-      path: /sys/fs/cgroup
-      type: Directory
-    name: cgroup
   - emptyDir: {}
     name: varlibdocker
 EOF
 }
 
+if [ "${SKIP_CREATE_TEST_RESOURCES:-}" == "true" ]; then
+    echo "SKIP: the step servicemesh-istio-e2e is going to be skipped because SKIP_CREATE_TEST_RESOURCES is set to true"
+    exit 0
+fi
+
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"
-create_pod "${MAISTRA_MC_POD}"
 check_pod_status "${MAISTRA_SC_POD}"
-check_pod_status "${MAISTRA_MC_POD}"
+# create ARTIFACT_DIR
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 
 echo "Successfully created maistra istio builder pods"

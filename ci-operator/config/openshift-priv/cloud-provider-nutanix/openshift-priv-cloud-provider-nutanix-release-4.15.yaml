@@ -1,30 +1,20 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
 binary_build_commands: go build .
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.13
+  from_repository: true
 canonical_go_repository: github.com/nutanix-cloud-native/cloud-provider-nutanix
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: nutanix-cloud-controller-manager
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    to: nutanix-cloud-controller-manager
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -49,6 +39,14 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix
+- as: e2e-nutanix-windows
+  cluster: build01
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-nutanix-ovn-hybrid
 - as: unit
   commands: make unit-test
   container:
@@ -57,6 +55,12 @@ tests:
   commands: test -z $(gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/"))
   container:
     from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

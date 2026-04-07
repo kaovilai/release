@@ -11,14 +11,6 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -40,23 +32,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/aws-efs-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-  to: aws-efs-csi-operator-create-efs
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    from: base
+    to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
   - as: aws-efs-csi-driver-operator-bundle
@@ -78,8 +60,9 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  name: 4.12-priv
-  namespace: ocp-private
+  to:
+  - name: 4.12-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -106,22 +89,21 @@ tests:
   commands: make verify
   container:
     from: src
-- as: operator-e2e
+- always_run: false
+  as: operator-e2e
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
-      CLUSTERCSIDRIVER: efs.csi.aws.com
       OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
-      OO_PACKAGE: aws-efs-csi-driver-operator
-      OO_TARGET_NAMESPACES: '!all'
-      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
       TEST_SUITE: openshift/csi
-      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
     workflow: openshift-e2e-aws-csi-efs
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

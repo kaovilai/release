@@ -3,7 +3,7 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}"-"${UNIQUE_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
 GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
@@ -33,16 +33,9 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     --recurse packer@"${INSTANCE_PREFIX}":~/.crc/crc.log ${ARTIFACT_DIR}
 
-echo "scp e2e test logs back to pod"
+echo "scp test logs and build artifacts dir back to pod"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --quiet \
     --project "${GOOGLE_PROJECT_ID}" \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse packer@"${INSTANCE_PREFIX}":~/crc/test/e2e/out/test-results/ ${ARTIFACT_DIR} || true
-
-echo "scp integration test logs back to pod"
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-    --quiet \
-    --project "${GOOGLE_PROJECT_ID}" \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse packer@"${INSTANCE_PREFIX}":~/crc/test/integration/out/ ${ARTIFACT_DIR} || true
+    --recurse packer@"${INSTANCE_PREFIX}":~/crc/out/ ${ARTIFACT_DIR} || true

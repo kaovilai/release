@@ -2,23 +2,17 @@ label:
   restricted_labels:
     openshift/os:
     - allowed_teams:
-      - openshift-patch-managers
+      - openshift-staff-engineers
       allowed_users:
-      - bgilbert
-      - cgwalters
       - dustymabe
       - jlebon
-      - miabbott
       - mike-nguyen
       - ravanelli
       - travier
       label: backport-risk-assessed
     - allowed_users:
-      - bgilbert
-      - cgwalters
       - dustymabe
       - jlebon
-      - miabbott
       - mike-nguyen
       - ravanelli
       - travier
@@ -32,3 +26,4 @@ triggers:
   - openshift/os
   trusted_apps:
   - coreosbot-releng
+  - openshift-merge-bot

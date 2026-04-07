@@ -6,19 +6,18 @@
 
 approvers:
 - aneeshkp
-- dcbw
+- bpickard22
 - dougbtv
-- fepan
 - maiqueb
+- pliurh
 - s1061123
 - zshi-redhat
 options: {}
 reviewers:
 - aneeshkp
-- dcbw
+- bpickard22
 - dougbtv
-- fepan
 - maiqueb
-- nicklesimba
+- pliurh
 - s1061123
 - zshi-redhat

@@ -9,16 +9,13 @@ filters:
     approvers:
     - alanconway
     - jcantrill
-    - periklis
     reviewers:
     - alanconway
-    - aminesnow
     - btaani
     - cahartma
     - eranra
     - jcantrill
-    - periklis
-    - pmoogi-redhat
+    - joaobravecoding
     - shwetaap
     - syedriko
     - vimalk78

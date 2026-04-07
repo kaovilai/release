@@ -8,16 +8,19 @@ echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # Clusters to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
+PREPARED_CLUSTER=("cnfdu1")
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -25,9 +28,13 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
-# Run cnftests job on Upstream cluster
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+# If the job trigger is "periodic" or "nightly" or the repository owner is "openshift-kni",
+# use the upstream cluster to run the job.
+if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]] || [[ "$REPO_OWNER" == "openshift-kni" ]]; then
     INTERNAL=false
+    INTERNAL_ONLY=false
+else
+    # Run other jobs on any cluster
     INTERNAL_ONLY=false
 fi
 # Whether to use the bastion environment
@@ -41,20 +48,56 @@ elif $INTERNAL; then
     CL_SEARCH="any"
 fi
 
+# We run SRIOV jobs only on internal network
+if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
+    CL_SEARCH="internalbos"
+fi
+
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
-${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
+${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 ADDITIONAL_ARG=""
-# default to the first cluster in the array, unless 4.14
+# default to the first cluster in the array, unless 4.17 or 4.18
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force" 
-  if [[ "$T5CI_VERSION" == "4.14" ]]; then 
-    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
-  fi 
+    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
 else
-  ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
+    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} "
+fi
+
+# Choose topology for different job types:
+# Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
+# Periodic cnftests job will use 2b(as we hardcoded to cnfdu1 and cnfdu3)
+# PR against release repo will i.e use i.e of 1b1v or 2b whichever is available
+# Any Pr against openshift-kni repo or rehersal job for openshift-kni repo to use 1b1v
+# Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
+# Run sno job with SNO topology
+
+
+if [ "$REPO_OWNER" == "openshift-kni" ]; then
+  # Run PR job on openshift-kni repo with 1b1v topology and exclude cnfdu5, cnfdu6, cnfdu7, cnfdu8
+  # as they are used for nightly jobs
+  TOPOLOGY_SELECTION="--topology 1b1v --exclude cnfdu5 --exclude cnfdu6 --exclude cnfdu7 --exclude cnfdu8"
+else
+  TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
+fi
+
+if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"
+elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
+elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
+elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
+fi
+
+if [[ "$JOB_NAME" == *"telcov10n-functional-cnf-compute-llc-"* ]]; then
+    # For QE AMD jobs
+    INTERNAL=true
+    INTERNAL_ONLY=true
+    ADDITIONAL_ARG=" -e amd"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -83,13 +126,14 @@ EOF
 
 # Check connectivity
 ping ${BASTION_IP} -c 10 || true
-echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
+echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -110,7 +154,7 @@ if $BASTION_ENV; then
 # Run on upstream lab with bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q centos@${BASTION_IP}"'
+${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
 
 else
@@ -139,7 +183,9 @@ cat << EOF > ~/ocp-install.yml
       timeout: 300
 
   - name: Remove last run
-    shell: kcli delete plan --yes ${PLAN_NAME}
+    shell: |
+        kcli delete plan --yes ${PLAN_NAME}
+        kcli delete plan --yes ${CLUSTER_NAME}
     ignore_errors: yes
 
   - name: Remove lock file
@@ -225,6 +271,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer
+      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -244,20 +294,19 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-cat << EOF > $SHARED_DIR/check-cluster.yml
+
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
 ---
-- name: Check if cluster is ready
+- name: Delete cluster
   hosts: hypervisor
   gather_facts: false
   tasks:
 
-  - name: Check if cluster is available
-    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
-    register: ready_check
+  - name: Delete deployment plan
+    shell: kcli delete plan -y ${PLAN_NAME}
+    args:
+      chdir: ~/kcli-openshift4-baremetal
 
-  - name: Fail when cluster is not available
-    shell: "echo Cluster ready: {{ ready_check.stdout }}"
-    failed_when: "'True' not in ready_check.stdout"
 EOF
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
@@ -266,12 +315,10 @@ EOF
 # in order to provide the desired return code later.
 PROCEED_AFTER_FAILURES="false"
 status=0
-if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
-else
+if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 exit ${status}

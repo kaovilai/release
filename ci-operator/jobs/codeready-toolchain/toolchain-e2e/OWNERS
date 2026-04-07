@@ -6,14 +6,22 @@
 
 approvers:
 - alexeykazakov
+- fbm3307
+- jrosental
 - matousjobanek
-- michaelkleinhenz
-- sbryzak
+- metlos
+- mfrancisc
+- rajivnathan
+- rsoaresd
 - xcoulon
 options: {}
 reviewers:
 - alexeykazakov
+- fbm3307
+- jrosental
 - matousjobanek
-- michaelkleinhenz
-- sbryzak
+- metlos
+- mfrancisc
+- rajivnathan
+- rsoaresd
 - xcoulon

@@ -32,7 +32,6 @@ plugins:
     plugins:
     - assign
     - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
@@ -56,3 +55,8 @@ plugins:
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - app-sre/deployment-validation-operator
+  trusted_apps:
+  - openshift-merge-bot

@@ -4,11 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 workdir=`mktemp -d`
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${workdir}/${CLUSTER_NAME}-bastion.ign"
 
 function patch_ignition_file()
@@ -81,6 +87,21 @@ EOF
 # /srv/squid/cache
 # ----------------------------------------------------------------
 
+# Some webesites (e.g: the backend of central ci registry) support
+# dual-stack dns. When accessing these websites via proxy, if the
+# proxy server does not have ipv6 outgoing capacity, the access
+# probably timeout. Though the proxy configuration support failover,
+# that would result in instablity for clients when the failover did
+# not happen yet. So here make the proxy use ipv4 to resolve the
+# dual-stack websites as the default behavior.
+
+if [[ "$IP_FAMILY" == *"DualStackIPv6Primary"* ]]; then
+    # when no setting, ipv6 DNS is preferred in squid process
+    proxy_dns_config="dns_v4_first off"
+else
+    proxy_dns_config="dns_v4_first on"
+fi
+
 ## PROXY Config
 cat > ${workdir}/squid.conf << EOF
 auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwords
@@ -90,6 +111,9 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+https_port 3129 cert=/etc/squid/server_domain.crt key=/etc/squid/server_domain.pem cafile=/etc/squid/client_ca.crt
+cache deny all
+${proxy_dns_config}
 EOF
 
 ## PROXY Service
@@ -110,7 +134,7 @@ ExecStart=/usr/bin/podman run --name "squid-proxy" \
 -v /srv/squid/etc:/etc/squid:Z \
 -v /srv/squid/cache:/var/spool/squid:Z \
 -v /srv/squid/log:/var/log/squid:Z \
-quay.io/crcont/squid
+quay.io/openshifttest/squid-proxy:4.13-fc31
 
 ExecReload=-/usr/bin/podman stop "squid-proxy"
 ExecReload=-/usr/bin/podman rm "squid-proxy"
@@ -122,10 +146,17 @@ RestartSec=30
 WantedBy=multi-user.target
 EOF
 
-PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
+if [[ "${CUSTOM_PROXY_CREDENTIAL}" == "true" ]]; then
+    PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/custom_proxy_creds_encrypted_apr1)
+else
+    PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
+fi
 PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
 PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
 PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid.service | sed 's/\"/\\"/g')
+PROXY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
+PROXY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+PROXY_CA_CONTENT=$(cat "/var/run/vault/mirror-registry/client_ca.crt" | base64 -w0)
 
 # proxy ignition
 proxy_ignition_patch=$(mktemp)
@@ -144,6 +175,27 @@ cat > "${proxy_ignition_patch}" << EOF
         "path": "/srv/squid/etc/squid.conf",
         "contents": {
           "source": "data:text/plain;base64,${PROXY_CONFIG_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/server_domain.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_CRT_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/server_domain.pem",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_KEY_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/client_ca.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_CA_CONTENT}"
         },
         "mode": 420
       },
@@ -245,8 +297,8 @@ cat > "${rsyncd_ignition_patch}" << EOF
 }
 EOF
 
-# patch rsync setting to ignition
 patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
+
 rm -f "${rsyncd_ignition_patch}"
 
 
@@ -280,8 +332,8 @@ ExecStart=/usr/bin/podman run --name poc-registry-${port} \
 -v /opt/registry-${port}/data:/var/lib/registry:z \
 -v /opt/registry-${port}/auth:/auth \
 -v /opt/registry-${port}/certs:/certs:z \
--v /opt/registry-${port}/config.yaml:/etc/docker/registry/config.yml \
-quay.io/openshifttest/registry:2
+-v /opt/registry-${port}/config.yaml:/etc/distribution/config.yml \
+quay.io/openshifttest/registry:3
 
 ExecReload=-/usr/bin/podman stop "poc-registry-${port}"
 ExecReload=-/usr/bin/podman rm "poc-registry-${port}"
@@ -327,8 +379,13 @@ EOF
 }
 
 REGISTRY_PASSWORD_CONTENT=$(cat "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" | base64 -w0)
-REGISTRY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
-REGISTRY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+if [[ "${SELF_MANAGED_REGISTRY_CERT}" == "true" ]]; then
+    REGISTRY_CRT_CONTENT=$(cat "${CLUSTER_PROFILE_DIR}/mirror_registry_server_domain.crt" | base64 -w0)
+    REGISTRY_KEY_CONTENT=$(cat "${CLUSTER_PROFILE_DIR}/mirror_registry_server_domain.pem" | base64 -w0)
+else
+    REGISTRY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
+    REGISTRY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+fi
 
 declare -a registry_ports=("5000" "6001" "6002")
 
@@ -344,9 +401,9 @@ done
 patch_file=$(mktemp)
 
 # patch proxy for 6001 quay.io
-reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.url')
-reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
-reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.url')
+reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.user')
+reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.password')
 cat > "${patch_file}" << EOF
 proxy:
   remoteurl: "${reg_quay_url}"

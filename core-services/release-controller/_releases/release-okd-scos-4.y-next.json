@@ -2,25 +2,27 @@
   "name":"4-scos-next",
   "as": "Stable",
   "message": "Preview OKD/SCOS versions are tracked here",
-  "overrideCLIImage": "image-registry.openshift-image-registry.svc:5000/ocp/4.12:cli",
+  "overrideCLIImage": "image-registry.openshift-image-registry.svc:5000/ocp/4.19:cli",
   "expires":"72h",
   "maxUnreadyReleases": 1,
-  "minCreationIntervalSeconds": 3600,
+  "minCreationIntervalSeconds": 43200,
   "pullSecretName": "source",
   "publish":{},
-  "verify": {
-    "aws": {
-      "maxRetries": 2,
+  "verify":{
+    "upgrade":{
+      "upgrade":true,
       "prowJob": {
-        "name": "periodic-ci-openshift-release-master-okd-scos-4.13-e2e-aws-ovn"
-      }
-    },
-    "aws-upgrade":{
-      "maxRetries": 2,
-      "prowJob": {
-        "name": "periodic-ci-openshift-release-master-okd-scos-4.13-e2e-aws-ovn-upgrade"
+        "name":"release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-next"
       },
-      "upgrade": true
+      "maxRetries": 2
+    },
+    "upgrade-minor":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob": {
+        "name":"release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-next"
+      },
+      "maxRetries": 2
     }
   }
 }

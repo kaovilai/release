@@ -5,13 +5,23 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- adriengentil
 - avishayt
+- carbonin
+- crystalchun
+- danmanor
+- eliorerz
 - eranco74
-- mkowalski
-- osherdp
+- gamli75
+- rccrdpccl
 options: {}
 reviewers:
+- adriengentil
 - avishayt
+- carbonin
+- crystalchun
+- danmanor
+- eliorerz
 - eranco74
-- mkowalski
-- osherdp
+- gamli75
+- rccrdpccl

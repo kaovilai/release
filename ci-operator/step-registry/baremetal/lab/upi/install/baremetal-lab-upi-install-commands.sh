@@ -57,15 +57,24 @@ function destroy_bootstrap() {
   . <(yq -P e -I0 -o=p '.[] | select(.name|test("bootstrap"))' "$SHARED_DIR/hosts.yaml" | sed 's/^\(.*\) = \(.*\)$/\1="\2"/')
   # shellcheck disable=SC2154
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${CLUSTER_NAME}" "${mac}"<< 'EOF'
+    "${CLUSTER_NAME}" "${mac}" "${ip}" "${DISCONNECTED}"<< 'EOF'
   BUILD_ID="$1"
   mac="$2"
+  ip="$3"
+  DISCONNECTED="$4"
   echo "Destroying bootstrap: removing the DHCP/PXE config..."
-  sed -i "/^dhcp-host=$mac/d" /opt/dhcpd/root/etc/dnsmasq.conf
+  sed -i "/^$mac/d" /opt/dnsmasq/hosts/hostsdir/"${BUILD_ID}"
+  kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
   echo "Destroying bootstrap: removing the grub config..."
-  rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
+  rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
   echo "Destroying bootstrap: removing dns entries..."
   sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
+  if [ "${DISCONNECTED}" == "true" ]; then
+    echo "Destroying bootstrap: removing drop rule for disconnected network..."
+    rule=$(iptables -S FORWARD | grep "${ip}" | grep DROP | sed 's/^-A /-D /')
+    read -r -a RULE <<< "${rule}"
+    [[ "${rule}" =~ D.*$ip.*DROP ]] && iptables "${RULE[@]}"
+  fi
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
   # using sed -i leads to creating a new file with a different inode number.
@@ -77,17 +86,40 @@ function destroy_bootstrap() {
   sed '/server bootstrap-/d' "${F}" > "${F}.tmp"
   cat "${F}.tmp" > "${F}"
   rm -rf "${F}.tmp"
-  docker kill -s HUP "haproxy-${BUILD_ID}"
-  docker exec bind9 rndc reload
-  docker exec bind9 rndc flush
-  docker restart dhcpd
+  podman kill -s HUP "haproxy-${BUILD_ID}"
+  podman exec bind9 rndc reload
+  podman exec bind9 rndc flush
 EOF
   # do not fail if unable to wipe the bootstrap disk and do not release it, to retry later in post steps
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
-  if ! wait_for_power_down "${bmc_address}" "${bmc_user}" "${bmc_pass}"; then
+  # shellcheck disable=SC2154
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+  if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}"; then
     echo "The bootstrap node didn't power off and it will not be released to retry in the deprovisioning steps..."
     return 0
   fi
+
+  if [ -z "${pdu_uri}" ]; then
+    echo "pdu_uri is empty... skipping pdu reset"
+  else
+    pdu_host=${pdu_uri%%/*}
+    pdu_socket=${pdu_uri##*/}
+    pdu_creds=${pdu_host%%@*}
+    pdu_host=${pdu_host##*@}
+    pdu_user=${pdu_creds%%:*}
+    pdu_pass=${pdu_creds##*:}
+    # pub-priv key auth is not supported by the PDUs
+    echo "${pdu_pass}" > /tmp/ssh-pass
+
+    timeout -s 9 10m sshpass -f /tmp/ssh-pass ssh "${SSHOPTS[@]}" "${pdu_user}@${pdu_host}" <<EOF || true
+olReboot $pdu_socket
+quit
+EOF
+    if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}" "${vendor}"; then
+      echo "The bootstrap node PDU reset was not successful... it will not be released to retry in the deprovisioning steps..."
+      return 0
+    fi
+  fi
+
   echo "Releasing the bootstrap node..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
         "${CLUSTER_NAME}" << 'EOF'
@@ -118,63 +150,45 @@ EOF
   echo "Releasing lock $LOCK_FD ($LOCK)"
   flock -u $LOCK_FD
 EOF
+  echo "Destroying bootstrap: removing the bootstrap node from hosts.yaml..."
   yq --inplace 'del(.[]|select(.name|test("bootstrap")))' "$SHARED_DIR/hosts.yaml"
+  scp "${SSHOPTS[@]}" "$SHARED_DIR/hosts.yaml" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 }
 
 function wait_for_power_down() {
   local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
+  local bmc_forwarded_port="${2}"
+  local bmc_user="${3}"
+  local bmc_pass="${4}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
+  local host="${bmc_forwarded_port##1[0-9]}"
+  host="${host##0}"
   sleep 90
   local retry_max=40 # 15*40=600 (10 min)
-  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "$bmc_address" \
+  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; do
-    echo "$bmc_address is not powered off yet... waiting"
+    echo "${host} is not powered off yet... waiting"
     sleep 30
     retry_max=$(( retry_max - 1 ))
   done
   if [ $retry_max -le 0 ]; then
-    echo -n "$bmc_address didn't power off successfully..."
-    if [ -f "/tmp/$bmc_address" ]; then
-      echo "$bmc_address kept powered on and needs further manual investigation..."
+    echo -n "${host} didn't power off successfully..."
+    if [ -f "/tmp/${host}" ]; then
+      echo "${host} kept powered on and needs further manual investigation..."
       return 1
     else
       # We perform the reboot at most twice to overcome some known BMC hardware failures
       # that sometimes keep the hosts frozen before POST.
-      echo "retrying $bmc_address again to reboot..."
-      touch "/tmp/$bmc_address"
-      reset_host "$bmc_address" "$bmc_user" "$bmc_pass"
-      wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass"
+      echo "retrying $ again to reboot..."
+      touch "/tmp/$host"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+      wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
-  echo "$bmc_address is now powered off"
+  echo "#$host is now powered off"
   return 0
-}
-
-function reset_host() {
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset $bmc_address"
-      return 1
-    fi
-    ipmitool -I lanplus -H "$bmc_address" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on $bmc_address, retrying..."
-    sleep 5
-  done
 }
 
 function approve_csrs() {
@@ -187,11 +201,52 @@ function approve_csrs() {
 }
 
 function update_image_registry() {
+  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
+  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+      echo "knownCapabilities contains ImageRegistry"
+      # check if ImageRegistry capability enabled
+      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
+            return 0
+        fi
+  fi
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
     echo "Sleeping before retrying to patch the image registry config..."
     sleep 60
   done
+  echo "$(date -u --rfc-3339=seconds) - Wait for the imageregistry operator to go available..."
+  oc wait co image-registry --for=condition=Available=True  --timeout=30m
+  oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
+  sleep 60
+  echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
+  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
+  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
+}
+
+function update_sno_bip_live_iso {
+  CONSOLE="ttyS1,115200n8"
+  root_device=$(echo "$architecture" | sed 's/arm64/\/dev\/nvme0n1/;s/amd64/\/dev\/sda/')
+  escaped_root_device=$(echo "$root_device" | sed 's/\//\\\//g')
+  shim_arch=$(echo "$architecture" | sed 's/arm64/aa64/;s/amd64/x64/')
+
+  b64_pre=$(jq -r '.storage.files[] | select( .path == "/usr/local/bin/install-to-disk.sh" ).contents.source' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign | cut -d"," -f2)
+  b64_new=$(echo "${b64_pre}" | base64 -d | sed -e '
+  s/^\(.*coreos-installer install.*\)$/\
+  if [ -e \/dev\/md126 ]; then mdadm --stop \/dev\/md126; fi\n \
+  if [ -e \/dev\/md127 ]; then mdadm --stop \/dev\/md127; fi\n \
+  for i in $(lsblk -I8,259 -nd --output name); do wipefs -a \/dev\/$i; done\n \
+  \1 --delete-karg console=ttyS0,115200n8 --console '"${CONSOLE}"' --insecure-ignition --copy-network\n \
+  echo "Adding UEFI boot entry for Red Hat CoreOS"\n \
+  efibootmgr -c -d '"${escaped_root_device}"' -p 2 -c -L "Red Hat CoreOS" -l '\''\\EFI\\redhat\\shim'"${shim_arch}"'.efi'\'' || echo "WARNING: Failed to set UEFI boot entry. Possibly BIOS mode."/' | base64 -w0)
+
+  sed -i -e 's/'"${b64_pre}"'/'"${b64_new}"'/g' ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign
+
+  mv ${INSTALL_DIR}/bootstrap-in-place-for-live-iso.ign ${INSTALL_DIR}/bootstrap.ign
+  chmod 644 ${INSTALL_DIR}/bootstrap.ign
+
 }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
@@ -207,14 +262,19 @@ INSTALL_DIR="/tmp/installer"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
+export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
 
-if [ "${DISCONNECTED}" == "true" ]; then
+# We change the payload image to the one in the mirror registry only when the mirroring happens.
+# For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
+# To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
-# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
+# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
@@ -236,9 +296,20 @@ compute:
   name: worker
   replicas: ${workers}"
 
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  echo "[INFO] Applying patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+done
+
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 
@@ -257,7 +328,13 @@ done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.ya
 
 ### Create Ignition configs
 echo -e "\nCreating Ignition configs..."
-oinst create ignition-configs
+if [ "${BOOTSTRAP_IN_PLACE:-false}" == "true" ]; then
+  oinst create single-node-ignition-config
+  update_sno_bip_live_iso
+else
+  oinst create ignition-configs
+fi
+
 export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 
 echo -e "\nPreparing firstboot ignitions for sync..."
@@ -266,6 +343,7 @@ cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
@@ -277,7 +355,7 @@ echo -e "\nPower on the hosts..."
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [ ${#bmc_address} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ]; then
+  if [ ${#bmc_forwarded_port} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ]; then
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
@@ -286,8 +364,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # on a single-arch payload migrated to a multi-arch cluster)
     continue
   fi
-  echo "Power on ${bmc_address//.*/} (${name})..."
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+  echo "Power on #${host} (${name})..."
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
@@ -301,9 +379,10 @@ if ! wait $!; then
   exit 1
 fi
 
-destroy_bootstrap &
-approve_csrs &
-update_image_registry &
+if [ "${BOOTSTRAP_IN_PLACE:-false}" != "true" ]; then
+  destroy_bootstrap &
+  approve_csrs &
+fi
 
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
@@ -322,6 +401,7 @@ fi
 # mixed arch nodes.
 echo -e "\nWaiting for all the nodes to be ready..."
 wait_for_nodes_readiness ${EXPECTED_NODES}
+update_image_registry
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch  "${SHARED_DIR}/success"

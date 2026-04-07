@@ -4,10 +4,8 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build03
+    cluster: build04
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -22,15 +20,26 @@ postsubmits:
         - --target=publish-coverage
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /secrets/osd-network-verifier-codecov-token
           name: osd-network-verifier-codecov-token
@@ -43,6 +52,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: osd-network-verifier-codecov-token
         secret:
           secretName: osd-network-verifier-codecov-token

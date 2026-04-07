@@ -6,17 +6,21 @@ chain:
     commands: |-
       set -exuo pipefail
 
+      HCP_CLI="/usr/bin/hcp"
+      if [[ ! -f $HCP_CLI ]]; then
+          # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+          HCP_CLI="/usr/bin/hypershift"
+      fi
+      echo "Using $HCP_CLI for cli"
+
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-      bin/hypershift destroy cluster kubevirt \
+      $HCP_CLI destroy cluster kubevirt \
         --name ${CLUSTER_NAME} \
         --cluster-grace-period 15m
 
       echo "$(date) Finished deleting cluster"
-    from_image:
-      namespace: ocp
-      name: "4.13"
-      tag: hypershift-operator
+    from: hypershift-operator
     grace_period: 5m0s
     resources:
       requests:

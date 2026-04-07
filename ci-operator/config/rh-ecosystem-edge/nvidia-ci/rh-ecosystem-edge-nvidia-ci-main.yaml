@@ -1,11 +1,21 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: rhel-8-release-golang-1.17-openshift-4.11
 images:
-- dockerfile_path: Dockerfile
-  to: nvidia-ci-tools
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+promotion:
+  to:
+  - name: latest
+    namespace: nvidia-ci
 resources:
   '*':
     limits:
@@ -14,24 +24,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: "yes"
-  commands: make test-yes
+- as: lint
+  commands: ./scripts/golangci-lint.sh
   container:
-    from: src
-- as: gpu-operator-arm-bm-sno
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: ^(README|OWNERS|LICENSE)$|\.(md|adoc)$|^docs/|^\.github/
+- as: mirror-vcsref-image
+  postsubmit: true
+  skip_if_only_changed: ^(README|OWNERS|LICENSE)$|\.(md|adoc)$|^docs/|^\.github/
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nvidia-ci
+    env:
+      IMAGE_REPO: nvidia-ci
+      IMAGE_TAG: latest
     test:
-    - as: nightly
-      commands: make test-bm-arm-deployment
-      credentials:
-      - mount_path: /var/run/secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
-      from: nvidia-ci-tools
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
+    - ref: assisted-baremetal-images-publish
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

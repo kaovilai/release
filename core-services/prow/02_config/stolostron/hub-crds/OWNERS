@@ -15,7 +15,6 @@ approvers:
 - jakobgray
 - jlpadilla
 - jnpacker
-- joeg-pro
 - leena-jawale
 - mprahl
 - nathanweatherly
@@ -23,11 +22,8 @@ approvers:
 - therealhaoliu
 - xrajesh
 - zhiweiyin318
-- zkayyali812
 options: {}
 reviewers:
 - cameronmwall
 - jakobgray
-- joeg-pro
 - nathanweatherly
-- zkayyali812

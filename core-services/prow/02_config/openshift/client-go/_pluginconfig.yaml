@@ -2,14 +2,15 @@ label:
   restricted_labels:
     openshift/client-go:
     - allowed_users:
-      - soltysh
-      - sttts
-      - s-urbaniak
+      - JoelSpeed
       - tkashem
+      - p0lyn0mial
+      - benluddy
+      - vrutkovs
+      - ingvagabund
       label: backport-risk-assessed
     - allowed_users:
       - xingxingxia
-      - kasturinarra
       - zhouying7780
       - wangke19
       - gangwgr

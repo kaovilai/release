@@ -10,12 +10,14 @@ build_root:
     namespace: stolostron
     tag: go1.18-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: placement
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: placement
 promotion:
-  name: "2.1"
-  namespace: stolostron
+  to:
+  - name: "2.1"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -59,24 +61,6 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        export KUBECTL
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: placement
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: publish
   postsubmit: true
   steps:

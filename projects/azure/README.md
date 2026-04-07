@@ -23,7 +23,7 @@ in our CI. Namely:
 
   This tool is responsible for running [jobs](#ci-operator-jobs) by using Openshift resources.
   There are a bunch of useful docs in the `ci-operator` repo, it is suggested to
-  go through at least [ONBOARD.md](https://github.com/openshift/ci-tools/blob/master/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-tools/blob/master/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-tools/blob/master/CONFIGURATION.md).
+  go through at least [ONBOARD.md](https://github.com/openshift/ci-tools/blob/main/ONBOARD.md), [ARCHITECTURE.md](https://github.com/openshift/ci-tools/blob/main/ARCHITECTURE.md), and [CONFIGURATION.md](https://github.com/openshift/ci-tools/blob/main/CONFIGURATION.md).
   You should ensure you familiarize yourself with `ci-operator`.
 
 * [Prow](https://github.com/kubernetes/test-infra/blob/master/prow/getting_started_deploy.md)
@@ -117,7 +117,7 @@ If you don't find a match, you should open a new issue to track the new failure 
 Otherwise, link the existing issue in your PR. Then, you can `/retest` your PR.
 
 For any infrastructure-related issues, make sure to contact the Developer Productivity
-team who is responsible for managing the OpenShift CI Infrastructure at [#forum-testplatform](https://coreos.slack.com/).
+team who is responsible for managing the OpenShift CI Infrastructure at [#forum-ocp-testplatform](https://redhat-internal.slack.com/).
 
 Optionally, you can request specific long-running tests to run that are not
 running in PRs by default.
@@ -282,7 +282,7 @@ ask an existing member of the `azure-team` group to apply the changes on the clu
 oc apply -f cluster-wide.yaml
 ``
 
-In general, all changes in `projects/azure/` are not automatically applied in the CI cluster. CI admins can be contacted at [#forum-testplatform](https://coreos.slack.com/). After your
+In general, all changes in `projects/azure/` are not automatically applied in the CI cluster. CI admins can be contacted at [#forum-ocp-testplatform](https://redhat-internal.slack.com/). After your
 pull request is merged, apart from updating the group, you should be able to `oc apply` all other changes
 in the `azure` namespace.
 

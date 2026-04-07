@@ -5,19 +5,22 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- ahrabovs
 - ajpantuso
 - ankit152
 - apahim
 - ashishmax31
+- eqrx
 - erdii
-- garrettthomaskth
-- sandhyadalavi
-- thetechnick
-- yashvardhan-kukreja
+- nanyte25
+- pat-cremin
+- robshelly
+- sclarkso
+- venkateshsredhat
 options: {}
 reviewers:
 - ajpantuso
+- ankit152
 - apahim
 - ashishmax31
-- thetechnick
-- yashvardhan-kukreja
+- venkateshsredhat

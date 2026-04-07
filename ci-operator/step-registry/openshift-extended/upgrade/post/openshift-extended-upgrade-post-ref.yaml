@@ -11,7 +11,7 @@ ref:
         MCO|ETCD|PSAP|SDN|STORAGE|API_Server|Authentication|Cluster_Operator
         Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK
         Workloads|Image_Registry|Container_Engine_Tools
-        NODE|OTA|PerfScale|Cluster_Observability
+        NODE|OTA|PerfScale|Cluster_Observability|OAP
     documentation: |-
       Select the test case for post-upgrade. It's a RE pattern and is passed to the 'grep -E'
   - name: TEST_ADDITIONAL_POSTUPG
@@ -23,9 +23,15 @@ ref:
     documentation: |
       It is filters to select case based on some case attribution which is in case title.
   - name: FILTERS_ADDITIONAL
-    default: ""
+    default: "~StressTest&"
     documentation: |
       It is additional filters to combine the TEST_FILTERS to make final filters.
+  - name: MODULE_FILTERS_POSTUPG
+    default: ""
+    documentation: |
+      After test filsters are executed, it is filters to select case for certain moudle.
+      the formart: <moudle_name1>:<filters1>#<moudle_name2>:<fitlers2>#<moudle_nameN>:<fitlersN>
+      the example: OLM:V1&;~Catalog&#Operator_SDK:~opm&;Cve&
   - name: TEST_FILTERS_POSTUPG
     default: ""
     documentation: |
@@ -45,9 +51,10 @@ ref:
   - name: FORCE_SUCCESS_EXIT
     default: "yes"
     documentation: |-
-      if there is step after openshift-extended-upgrade-post step in test,
-      you could set it as yes to ensure the subsequence step is executed. Or else, once openshift-extended-test step fails,
-      the subsequence step is not executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+      Setting this to 'yes' will allow some statements in the scripts not to let the step fail, and further steps can
+      run. Setting it to 'no' will disable this behavior, letting any of those optional to succeed statements 
+      to stop the job and trigger the deprovisioning steps. Default: yes.
+      See https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
   resources:
     requests:
       cpu: "1"

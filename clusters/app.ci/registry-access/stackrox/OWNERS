@@ -1,12 +1,11 @@
 approvers:
 - c-du
 - dcaravel
-- gavin-stackrox
-- misberner
+- BradLugo
+- davdhacs
+- tommartensen
 - msugakov
 - rtann
-- sbostick
-- theencee
 - vjwilson
 - JoukoVirtanen
 - erthalion
@@ -18,12 +17,11 @@ options: {}
 reviewers:
 - c-du
 - dcaravel
-- gavin-stackrox
-- misberner
 - msugakov
 - rtann
-- sbostick
-- theencee
+- BradLugo
+- davdhacs
+- tommartensen
 - vjwilson
 - JoukoVirtanen
 - erthalion

@@ -6,12 +6,11 @@
 
 approvers:
 - ardaguclu
-- deads2k
-- mfojtik
-- soltysh
+- atiratree
+- ingvagabund
 options: {}
 reviewers:
 - ardaguclu
-- deads2k
-- mfojtik
-- soltysh
+- atiratree
+- ingvagabund
+- tchap

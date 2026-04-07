@@ -4,6 +4,15 @@ metadata:
   name: dptp-controller-manager-app-ci
 rules:
 - apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
   - prow.k8s.io
   resources:
   - prowjobs
@@ -77,7 +86,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-controller-manager\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: dptp-controller-manager
   name: dptp-controller-manager
@@ -89,24 +101,27 @@ spec:
       app: dptp-controller-manager
   template:
     metadata:
-      creationTimestamp: null
+      annotations:
+        ci-workload-autoscaler.openshift.io/scale: "false"
       labels:
         app: dptp-controller-manager
     spec:
+      tolerations:
+      - key: manual-provision
+        operator: Exists
       initContainers:
       - name: git-sync-init
         command:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
+        - --ref=main
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
-        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -116,14 +131,13 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --branch=master
-        - --wait=30
+        - --ref=main
+        - --period=30s
         - --root=/tmp/git-sync
-        - --max-sync-failures=3
-        env:
-        - name: GIT_SYNC_DEST
-          value: release
-        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -131,31 +145,19 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - image: dptp-controller-manager
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-controller-manager_latest
         name: dptp-controller-manager
+        imagePullPolicy: Always
         args:
         - --leader-election-namespace=ci
         - --release-repo-git-sync-path=/var/repo/release
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --github-app-id=$(GITHUB_APP_ID)
-        - --github-app-private-key-path=/etc/github/cert
+        - --github-token-path=/etc/github/oauth
+        - --github-hourly-tokens=4000
+        - --github-allowed-burst=2000
         - --registry-cluster-name=app.ci
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.10
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.11
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.12
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.13
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.11
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.12
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.13
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.11
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.12
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.13
-        - --testImagesDistributorOptions.additional-image-stream-namespace=ci
-        - --testImagesDistributorOptions.additional-image-stream=rhcos/machine-os-content
-        - --testImagesDistributorOptions.ignore-cluster-name=hive
-        - --enable-controller=test_images_distributor
         - --enable-controller=promotionreconciler
         - --enable-controller=serviceaccount_secret_refresher
         - --serviceAccountRefresherOptions.enabled-namespace=ci
@@ -179,7 +181,7 @@ spec:
         - name: metrics
           containerPort: 8080
         volumeMounts:
-        - name: github-app-credentials
+        - name: oauth
           mountPath: /etc/github
           readOnly: true
         - name: kubeconfigs
@@ -193,14 +195,16 @@ spec:
           mountPath: /etc/secret-mirroring
           readOnly: true
         resources:
+          limits:
+            memory: "48Gi"
           requests:
-            memory: "13Gi"
-            cpu: "1.5"
+            memory: "24Gi"
+            cpu: "1"
       serviceAccountName: dptp-controller-manager
       volumes:
-      - name: github-app-credentials
+      - name: oauth
         secret:
-          secretName: openshift-prow-github-app
+          secretName: github-credentials-openshift-merge-robot
       - name: kubeconfigs
         secret:
           secretName: dptp-controller-manager

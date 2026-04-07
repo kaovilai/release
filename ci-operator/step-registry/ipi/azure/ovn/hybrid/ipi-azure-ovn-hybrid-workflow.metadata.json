@@ -2,15 +2,12 @@
 	"path": "ipi/azure/ovn/hybrid/ipi-azure-ovn-hybrid-workflow.yaml",
 	"owners": {
 		"approvers": [
-			"aravindhp",
-			"sebsoto",
-			"sdn-approvers"
+			"winc-approvers",
+			"core-networking-approvers"
 		],
 		"reviewers": [
-			"aravindhp",
-			"sebsoto",
-			"mansikulkarni96",
-			"sdn-reviewers"
+			"winc-reviewers",
+			"core-networking-reviewers"
 		]
 	}
 }

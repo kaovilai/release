@@ -7,15 +7,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-golang-1.12
 canonical_go_repository: github.com/openshift/ironic-image
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base-os
-  to: ironic
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base-os
+    to: ironic
 promotion:
-  name: 4.2-priv
-  namespace: ocp-private
+  to:
+  - name: 4.2-priv
+    namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |

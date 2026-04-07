@@ -47,11 +47,11 @@ metadata:
   uid: 32120952-00cb-4563-8f11-63aa0e521527
 spec:
   agent: kubernetes
-  cluster: build02
+  cluster: build04
   decoration_config:
     censor_secrets: true
     gcs_configuration:
-      bucket: origin-ci-test
+      bucket: test-platform-results
       default_org: openshift
       default_repo: origin
       mediaTypes:
@@ -87,10 +87,10 @@ spec:
     skip_cloning: true
     timeout: 4h0m0s
     utility_images:
-      clonerefs: gcr.io/k8s-prow/clonerefs:v20210825-bc8cae85fb
-      entrypoint: gcr.io/k8s-prow/entrypoint:v20210825-bc8cae85fb
-      initupload: gcr.io/k8s-prow/initupload:v20210825-bc8cae85fb
-      sidecar: gcr.io/k8s-prow/sidecar:v20210825-bc8cae85fb
+      clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20240802-66b115076
+      entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20240802-66b115076
+      initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20240802-66b115076
+      sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20240802-66b115076
   extra_refs:
   - base_ref: master
     org: openshift
@@ -184,7 +184,7 @@ status:
     gcsreporter: failure
   startTime: "2021-08-26T01:41:15Z"
   state: failure
-  url: https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/periodic-ci-openshift-release-master-nightly-4.9-e2e-metal-assisted-ipv6/1430706875984252928
+  url: https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-openshift-release-master-nightly-4.9-e2e-metal-assisted-ipv6/1430706875984252928
 `
 
 	prowJob := &prowapi.ProwJob{}

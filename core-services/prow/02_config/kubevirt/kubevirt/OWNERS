@@ -7,11 +7,6 @@
 filters:
   .*:
     approvers:
-    - acardace
-    - alicefr
-    - alonakaplan
-    - davidvossel
-    - dhiller
     - enp0s3
     - fabiand
     - jean-edouard
@@ -20,15 +15,18 @@ filters:
     - vladikr
     reviewers:
     - 0xfelix
-    - acardace
-    - alicefr
-    - alonakaplan
-    - dhiller
     - enp0s3
+    - fossedihelm
     - jean-edouard
     - lyarwood
-    - maiqueb
     - mhenriks
-    - stu-gott
     - vladikr
+  BUILD\.bazel|.*\.bzl|WORKSPACE:
+    approvers:
+    - dhiller
+    labels:
+    - sig/buildsystem
+    reviewers:
+    - dollierp
+    - enp0s3
 options: {}

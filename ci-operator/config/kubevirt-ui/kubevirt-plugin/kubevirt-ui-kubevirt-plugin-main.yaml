@@ -2,24 +2,25 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: tectonic-console-builder-v24
+    tag: tectonic-console-builder-v29
 images:
-- dockerfile_path: Dockerfile
-  to: kubevirt-plugin
+  items:
+  - dockerfile_path: Dockerfile
+    to: kubevirt-plugin
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 16Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -31,8 +32,7 @@ tests:
       KUBEVIRT_PLUGIN_IMG_NAME: kubevirt-plugin
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m4.2xlarge
-      ZONES_COUNT: "1"
+      SPOT_INSTANCES: "true"
     test:
     - as: tests
       cli: latest
@@ -52,9 +52,13 @@ tests:
         name: kubevirt-plugin-img
       from: src
       resources:
+        limits:
+          ci-operator.openshift.io/shm: 2G
         requests:
+          ci-operator.openshift.io/shm: 2G
           cpu: 100m
           memory: 200Mi
+      timeout: 6h0m0s
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

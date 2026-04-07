@@ -1,59 +1,73 @@
 base_images:
-  os-min8:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  os-min9:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all binary-numacell
+  build-topics
 build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: os-min8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/manager
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
-  to: numaresources-operator
-- dockerfile_path: Dockerfile.openshift.rte
-  from: os-min8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
-  to: resource-topology-exporter
-- dockerfile_path: Dockerfile.openshift.tests
-  from: os-min8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: numaresources-operator-tests
+  items:
+  - dockerfile_path: Dockerfile.must-gather
+    to: numaresources-must-gather
+  - dockerfile_path: Dockerfile.openshift
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: numaresources-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: numaresources-operator-bundle
+  - dockerfile_path: Dockerfile.openshift.rte
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: resource-topology-exporter
+  - dockerfile_path: Dockerfile.openshift.tests
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: numaresources-operator-tests
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: tested-numaresources-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.14.999-snapshot
-    with: numaresources-operator
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.22.999-snapshot
+    with: pipeline:numaresources-operator
 promotion:
-  name: numaresources-operator
-  namespace: ocp-kni
+  to:
+  - name: numaresources-operator
+    namespace: ocp-kni
 releases:
   initial:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.22"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -64,69 +78,180 @@ tests:
   commands: make test-unit
   container:
     from: src
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
 - as: ci-install-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
-      OO_CHANNEL: alpha
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: numaresources-operator
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-main
+        ci-job-type ci-install-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
     test:
     - as: e2e-install-test
       cli: latest
-      commands: make test-install-e2e
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
+      commands: make test-install-e2e test-uninstall-e2e
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
-      OO_CHANNEL: alpha
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-numaresources
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-main
+        ci-job-type ci-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
     test:
     - as: e2e-test
       cli: latest
       commands: make test-e2e
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-must-gather-e2e
-  cron: 42 0 * * *
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: tested-numaresources-operator-bundle
     env:
-      OO_CHANNEL: alpha
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-numaresources
-      OO_PACKAGE: numaresources-operator
-      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-must-gather-e2e-numaresources-operator-main
+        ci-job-type ci-must-gather-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
     test:
     - as: must-gather-e2e-test
       cli: latest
-      commands: make test-must-gather-e2e
+      commands: E2E_NROP_MUSTGATHER_IMAGE_REF=${MUSTGATHER_IMAGE} make test-must-gather-e2e
+      dependencies:
+      - env: MUSTGATHER_IMAGE
+        name: pipeline:numaresources-must-gather
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: ci-e2e-install-hypershift
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
+    env:
+      HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_INSTALL_TIMEOUT_MINUTES: "20"
+      USE_HOSTED_KUBECONFIG: "true"
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: |-
+        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        make test-install-e2e test-uninstall-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: hypershift-optional-operators
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: numaresources-operator
+    workflow: openshift-ci-security
+- as: ci-install-e2e-compact
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      SIZE_VARIANT: compact
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-main
+        ci-job-type ci-install-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: make test-install-e2e test-uninstall-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: ci-e2e-compact
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: tested-numaresources-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      SIZE_VARIANT: compact
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-main
+        ci-job-type ci-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make test-compact-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

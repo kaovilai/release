@@ -1,0 +1,23 @@
+{
+	"path": "hypershift/kubevirt/create/disconnected/workarounds/hypershift-kubevirt-create-disconnected-workarounds-ref.yaml",
+	"owners": {
+		"approvers": [
+			"csrwng",
+			"enxebre",
+			"sjenning",
+			"LiangquanLi930",
+			"heliubj18",
+			"orenc1",
+			"tiraboschi"
+		],
+		"reviewers": [
+			"csrwng",
+			"enxebre",
+			"sjenning",
+			"LiangquanLi930",
+			"heliubj18",
+			"orenc1",
+			"tiraboschi"
+		]
+	}
+}

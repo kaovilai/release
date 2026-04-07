@@ -2,13 +2,10 @@
 	"path": "windows/e2e/operator/test/platform-none-vsphere/pre/windows-e2e-operator-test-platform-none-vsphere-pre-chain.yaml",
 	"owners": {
 		"approvers": [
-			"aravindhp",
-			"sebsoto"
+			"winc-approvers"
 		],
 		"reviewers": [
-			"aravindhp",
-			"sebsoto",
-			"mansikulkarni96"
+			"winc-reviewers"
 		]
 	}
 }

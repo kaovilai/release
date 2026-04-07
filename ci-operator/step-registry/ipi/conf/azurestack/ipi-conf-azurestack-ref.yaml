@@ -1,6 +1,9 @@
 ref:
   as: ipi-conf-azurestack
-  from: upi-installer
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
   commands: ipi-conf-azurestack-commands.sh
   resources:
     requests:
@@ -25,12 +28,16 @@ ref:
       These sizes are roughly consistent across all cloud providers, but we may not be able to instantiate some sizes
       in some regions or accounts due to quota issues.
   - name: AZURESTACK_ENDPOINT
-    default: 'https://management.ppe3.stackpoc.com'
+    default: 'https://management.mtcazs.wwtatc.com'
     documentation: |-
       The Azure Stack Hub Endpoint to connect to.
   - name: SUFFIX_ENDPOINT
-    default: "ppe3.stackpoc.com"
+    default: "mtcazs.wwtatc.com"
     documentation: |-
       The endpoint suffix for storage accounts.
+  - name: BASE_DOMAIN_RESOURCE_GROUP_NAME
+    default: "openshiftInstallerRG"
+    documentation: |-
+      The base domain resource group name
   documentation: |-
     The IPI ASH configure step generates the Azure Stack Hub specific install-config.yaml contents based on the cluster profile and optional input files.

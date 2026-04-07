@@ -5,16 +5,20 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- agarwal-mudit
 - brandisher
-- nbalacha
+- eggfoobar
+- jaypoulz
+- jeff-roche
+- jerpeter1
+- pacevedom
+- qjkee
 - suleymanakbas91
 options: {}
 reviewers:
-- agarwal-mudit
-- brandisher
-- iamniting
+- eggfoobar
+- jaypoulz
+- jeff-roche
 - jerpeter1
-- nbalacha
-- sp98
+- pacevedom
+- qjkee
 - suleymanakbas91

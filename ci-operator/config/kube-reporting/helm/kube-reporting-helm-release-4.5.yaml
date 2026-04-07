@@ -7,14 +7,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: k8s.io/helm
 images:
-- from: base
-  to: metering-helm
+  items:
+  - from: base
+    to: metering-helm
 promotion:
-  name: "4.5"
-  namespace: ocp
+  to:
+  - name: "4.5"
+    namespace: ocp
 releases:
   initial:
     integration:

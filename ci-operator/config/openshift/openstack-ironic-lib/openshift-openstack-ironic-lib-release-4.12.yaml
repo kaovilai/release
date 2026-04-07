@@ -4,13 +4,15 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.13
 images:
-- dockerfile_path: openstack-ilib-tester.Dockerfile
-  from: src
-  optional: true
-  to: ilib-tester
+  items:
+  - dockerfile_path: openstack-ilib-tester.Dockerfile
+    from: src
+    optional: true
+    to: ilib-tester
 promotion:
-  name: "4.12"
-  namespace: ocp
+  to:
+  - name: "4.12"
+    namespace: ocp
 releases:
   initial:
     integration:

@@ -1,6 +1,7 @@
 chain:
   as: cucushift-installer-rehearse-gcp-ipi-private-provision
   steps: 
+  - ref: gcp-provision-minimal-permission
   - ref: gcp-provision-vpc
   - ref: ignition-bastionhost
   - ref: gcp-provision-bastionhost
@@ -8,6 +9,8 @@ chain:
   - chain: ipi-conf-gcp
   - chain: ipi-install
   - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-private
   env:
   - name: PUBLISH
     default:  "Internal"

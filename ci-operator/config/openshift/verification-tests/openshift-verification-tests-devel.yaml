@@ -9,12 +9,14 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: tools/openshift-ci/Dockerfile
-  from: base
-  to: verification-tests
+  items:
+  - dockerfile_path: tools/openshift-ci/Dockerfile
+    from: base
+    to: verification-tests
 promotion:
-  namespace: ci
-  tag: devel
+  to:
+  - namespace: ci
+    tag: devel
 resources:
   '*':
     requests:

@@ -2,9 +2,13 @@
 	"path": "upi/deprovision/powervs/upi-deprovision-powervs-ref.yaml",
 	"owners": {
 		"approvers": [
-			"rpsene",
+			"cs-zhang",
 			"Kuldip-Nanda",
-			"manojnkumar"
+			"manojnkumar",
+			"Prajyot-Parab",
+			"prb112",
+			"pkenchap",
+			"multiarch-approvers"
 		]
 	}
 }

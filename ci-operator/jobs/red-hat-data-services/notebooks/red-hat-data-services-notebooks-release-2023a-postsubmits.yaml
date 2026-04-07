@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -24,7 +24,7 @@ postsubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -33,6 +33,9 @@ postsubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -45,6 +48,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -58,7 +64,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -71,19 +77,34 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-cuda-jupyter-min-ubi8-python-3-8-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -93,6 +114,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -103,7 +133,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -111,24 +141,55 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-cuda-jupyter-min-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-cuda-jupyter-min-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -138,6 +199,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -148,7 +218,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -161,19 +231,34 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-cuda-jupyter-tf-ubi8-python-3-8-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -183,6 +268,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -193,7 +287,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -201,24 +295,55 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-cuda-jupyter-tf-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-cuda-jupyter-tf-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -228,6 +353,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -238,7 +372,214 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-jupyter-datascience-anaconda-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-jupyter-datascience-anaconda-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -251,19 +592,34 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-ds-ubi8-python-3-8-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -273,6 +629,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -283,7 +648,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -291,24 +656,55 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-jupyter-ds-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-ds-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -318,6 +714,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -328,7 +733,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -336,24 +741,55 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-jupyter-min-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-min-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -363,6 +799,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -373,7 +818,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -386,19 +831,34 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -408,6 +868,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -418,7 +887,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -431,19 +900,34 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-pytorch-ubi8-python-3-8-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -453,6 +937,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -463,7 +956,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -471,24 +964,55 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -498,6 +1022,15 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -508,7 +1041,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2023a$
-    cluster: build02
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -516,24 +1049,55 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-red-hat-data-services-notebooks-release-2023a-notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -543,6 +1107,631 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-cuda-tensorflow-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-cuda-tensorflow-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-datascience-ubi8-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-datascience-ubi8-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-datascience-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-datascience-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-minimal-ubi8-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-minimal-ubi8-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-minimal-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-minimal-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-pytorch-ubi8-python-3-8-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-pytorch-ubi8-python-3-8-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2023a$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2023a-runtime-pytorch-ubi9-python-3-9-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-pytorch-ubi9-python-3-9-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

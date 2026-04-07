@@ -37,7 +37,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).' % $._config.grafanaDashboardIDs['dptp.json'],
+              message: 'Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).' % $._config.grafanaDashboardIDs['dptp.json'],
             },
           },
           {
@@ -61,6 +61,23 @@
         ],
       },
       {
+        name: 'quay-io-image-mirroring',
+        rules: [
+          {
+            alert: 'quay-io-image-mirroring-failures',
+            expr: 'sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])) > 0.5',
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures',
+            },
+          },
+        ],
+      },
+      {
         name: 'cluster-client-creation-failure',
         rules: [
           {
@@ -81,14 +98,24 @@
           {
             alert: 'high-ci-operator-infra-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+              (
+                sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+              )
+              and on (reason)
+              (
+                count by (reason) (
+                  sum by (reason, job_name) (
+                    rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
+                  ) > 0
+                ) >= 3
+              )
             |||,
-            'for': '1m',
+            'for': '5m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -99,14 +126,14 @@
           {
             alert: 'high-ci-operator-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.07
+              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.08
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.',
             },
           }
         ],
@@ -155,9 +182,22 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
+              message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
-          }
+          },
+          {
+            alert: 'ProbeFailing-Lenient',
+            expr: |||
+              up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
+            |||,
+            'for': '5m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past five minutes. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
+            },
+          },
         ],
       },
       {
@@ -166,23 +206,44 @@
           {
             alert: 'openshift-priv-image-building-jobs-failing',
             expr: |||
-             (
-               sum(
-                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state="success"}[12h])
-               )
-               /
-               sum(
-                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
-               )
-             )
-             < 0.90
+              (
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-priv-.*-images",org="openshift-priv",state="success"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-priv-(.*-images)"
+                  )
+                )
+                /
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-priv-.*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-priv-(.*-images)"
+                  )
+                )
+              ) < 0.90
+              and on (job_tail)
+              (
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-.*-images",org="openshift",state="success"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-(.*-images)"
+                  )
+                )
+                /
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-.*-images",org="openshift",state=~"success|failure|aborted"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-(.*-images)"
+                  )
+                )
+              ) >= 0.90
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
+              message: 'The priv image-building job branch-ci-openshift-priv-{{ $labels.job_tail }} is failing while the corresponding public job branch-ci-openshift-{{ $labels.job_tail }} remains healthy. See priv <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-openshift-priv-{{ $labels.job_tail }}|deck-internal> and public <https://prow.ci.openshift.org/?job=branch-ci-openshift-{{ $labels.job_tail }}|deck>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
             },
           }
         ],
@@ -197,7 +258,7 @@
             |||,
             'for': '1m',
             labels: {
-              severity: 'critical',
+              severity: 'warning',
             },
             annotations: {
               message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of {{ $labels.resource_type }} (actual: {{ $labels.determined_amount }}, configured: {{ $labels.configured_amount }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
@@ -211,14 +272,20 @@
           {
             alert: 'openshift-mirroring-failures',
             expr: |||
-              increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
+              sum by (job_name) (
+                rate(
+                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[6h]
+                )
+              )
+              * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="image-mirroring",label_ci_openshift_io_area="openshift"}) == 0
             |||,
             'for': '1m',
+            'keep_firing_for': '2h',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.',
+              message: 'OpenShift image mirroring jobs have had no successful run in the last 6 hours. The primary recovery target is to restore at least one successful run after repeated failures. Check <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/openshift-mirroring-failures.md|SOP>.',
             },
           }
         ],

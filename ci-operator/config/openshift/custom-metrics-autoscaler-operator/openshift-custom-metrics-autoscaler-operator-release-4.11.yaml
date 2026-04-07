@@ -10,11 +10,13 @@ build_root:
     tag: rhel-8-release-golang-1.17-openshift-4.11
 canonical_go_repository: github.com/kedacore/keda-olm-operator
 images:
-- from: base
-  to: custom-metrics-autoscaler-operator
+  items:
+  - from: base
+    to: custom-metrics-autoscaler-operator
 promotion:
-  name: "4.11"
-  namespace: ocp
+  to:
+  - name: "4.11"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -47,6 +49,13 @@ tests:
   commands: env && GOFLAGS="" hack/cma-verify-history.sh
   container:
     from: src
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: custom-metrics-autoscaler-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.11
   org: openshift

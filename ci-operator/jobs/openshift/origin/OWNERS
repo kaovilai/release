@@ -7,23 +7,19 @@
 filters:
   .*:
     approvers:
-    - bparees
+    - bertinatto
     - deads2k
-    - derekwaynecarr
     - dgoodwin
-    - eparis
-    - knobunc
-    - mfojtik
-    - pweil-
-    - sjenning
-    - soltysh
+    - neisw
+    - petr-muller
+    - smg247
+    - sosiouxme
     - stbenjam
-    - sttts
+    - xueqzhan
     reviewers:
-    - bparees
     - deads2k
+    - p0lyn0mial
     - sjenning
-    - soltysh
   ^\.go.(mod|sum)$:
     labels:
     - vendor-update

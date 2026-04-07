@@ -5,24 +5,22 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- christianvogt
-- invinciblejai
-- jerolimov
-- jrichter1
-- karthikjeeyar
-- rohitkrai03
-options: {}
-reviewers:
-- abhinandan13jan
-- christianvogt
-- debsmita1
-- divyanshigupta
-- invinciblejai
-- jrichter1
+- caugello
 - karthikjeeyar
 - katka92
 - rohitkrai03
-- rottencandy
 - sahil143
-- sawood14012
-- vikram-raj
+options: {}
+reviewers:
+- abhinandan13jan
+- caugello
+- cryptorodeo
+- jeff-phillips-18
+- joaopedropp
+- karthikjeeyar
+- katka92
+- marcin-michal
+- rohitkrai03
+- sahil143
+- stanislavjochman
+- testcara

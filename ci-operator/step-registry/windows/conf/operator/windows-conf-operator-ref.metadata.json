@@ -2,13 +2,10 @@
 	"path": "windows/conf/operator/windows-conf-operator-ref.yaml",
 	"owners": {
 		"approvers": [
-			"aravindhp",
-			"sebsoto"
+			"winc-approvers"
 		],
 		"reviewers": [
-			"aravindhp",
-			"sebsoto",
-			"mansikulkarni96"
+			"winc-reviewers"
 		]
 	}
 }

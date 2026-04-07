@@ -2,17 +2,22 @@ chain:
   as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
   steps:
   - chain: cucushift-installer-rehearse-aws-ipi-ovn-provision
-  - ref: hypershift-install
+  - chain: cucushift-hypershift-extended-install-private
+  - ref: cucushift-hypershift-extended-enable-additional-trust-bundle
   - chain: hypershift-aws-create
-  - chain: cucushift-hypershift-extended-enable-qe-catalogsource
-  - ref: cucushift-hypershift-extended-health-check
+  - ref: cucushift-hypershift-extended-enable-custom-image-registry
+  - ref: cucushift-hypershift-extended-global-pull-secret
   env:
+  - name: BASE_DOMAIN
+    default: "qe.devcluster.openshift.com"
   - name: HYPERSHIFT_BASE_DOMAIN
     default: "qe.devcluster.openshift.com"
   - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
     default: "true"
   - name: HYPERSHIFT_AWS_REGION
-    default: "us-east-2"
+    default: ""
+  - name: HYPERSHIFT_HC_ZONES
+    default: ""
   - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
     default: "HighlyAvailable"
   - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
@@ -23,5 +28,7 @@ chain:
     default: "true"
   - name: COMPUTE_NODE_REPLICAS
     default: "3"
+  - name: USAGE_CLUSTER_TYPE
+    default: "hypershift-mgmt"
   documentation: |-
     Create an IPI cluster on AWS with OVN and hypershift for QE e2e tests.

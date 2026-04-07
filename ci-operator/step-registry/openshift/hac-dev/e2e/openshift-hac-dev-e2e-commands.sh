@@ -3,11 +3,9 @@
 export HOME WORKSPACE CHROME_IMAGE CHROME_TAG
 HOME=/tmp
 WORKSPACE=$(pwd)
-CHROME_IMAGE="quay.io/cloudservices/insights-chrome-frontend"
-CHROME_TAG="f5f1929"
 
 #Vault Secrets
-export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC
+export HAC_KC_SSO_URL KC_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG CYPRESS_SNYK_TOKEN
 HAC_KC_SSO_URL=$(cat /usr/local/ci-secrets/devsandbox/sso_hostname)
 HAC_KC_USERNAME=$(cat /usr/local/ci-secrets/devsandbox/username)
 HAC_KC_PASSWORD=$(cat /usr/local/ci-secrets/devsandbox/new-password)
@@ -17,6 +15,13 @@ CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/github/github-token)
 CYPRESS_GH_PASSWORD=$(cat /usr/local/ci-secrets/github/github-password)
 CYPRESS_QUAY_TOKEN=$(cat /usr/local/ci-secrets/github/quay-token)
 CYPRESS_RP_HAC=$(cat /usr/local/ci-secrets/github/report-portal-token-hac)
+CYPRESS_VC_KUBECONFIG=$(cat /usr/local/ci-secrets/github/vc-kubeconfig)
+CYPRESS_SNYK_TOKEN=$(cat /usr/local/ci-secrets/github/snyk_token)
+
+#Vault Secrets for RH Trusted Profile Analyzer (testing SBOM)
+export CYPRESS_ATLAS_PASSWORD CYPRESS_ATLAS_USERNAME
+CYPRESS_ATLAS_USERNAME=$(cat /usr/local/ci-secrets/github/atlas_stage_acc)
+CYPRESS_ATLAS_PASSWORD=$(cat /usr/local/ci-secrets/github/atlas_stage_pass)
 
 #QONTRACT
 export QONTRACT_PASSWORD QONTRACT_USERNAME QONTRACT_BASE_URL
@@ -29,26 +34,6 @@ export OC_LOGIN_TOKEN OC_LOGIN_SERVER
 OC_LOGIN_TOKEN=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-token)
 OC_LOGIN_SERVER=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-server)
 
-echo "Preparing bonfire config"
-CONFIG_DIR=$(mktemp -d)
-cat > "$CONFIG_DIR/config.yaml" << EOF
-# Bonfire deployment configuration
-# Defines where to fetch the file that defines application configs
-appsFile:
-  host: gitlab
-  repo: insights-platform/cicd-common
-  path: bonfire_configs/ephemeral_apps.yaml
-# (optional) define any apps locally. An app defined here with <name> will override config for app
-# <name> in above fetched config.
-apps:
-- name: insights-ephemeral
-  components:
-    - name: frontend-configs
-      host: github
-      repo: redhat-hac-qe/frontend-configs
-      path: deploy/deploy.yaml
-EOF
-
 echo "Installing bonfire."
 export LANG LC_ALL
 LANG=en_US.utf-8
@@ -58,7 +43,7 @@ python3 -m venv .bonfire_venv
 source .bonfire_venv/bin/activate
 
 python3 -m pip install --upgrade pip 'setuptools<58' wheel
-python3 -m pip install --upgrade 'crc-bonfire>=4.10.4'
+python3 -m pip install --upgrade 'crc-bonfire>=4.18.0'
 
 export KUBECONFIG_DIR KUBECONFIG
 KUBECONFIG_DIR="$WORKSPACE/.kube"
@@ -79,31 +64,55 @@ HOSTNAME=$(oc get feenv ${ENV_NAME} -o json | jq ".spec.hostname" | tr -d '"')
 oc patch feenv ${ENV_NAME} --type merge  -p '{"spec":{"sso": "'$HAC_KC_SSO_URL'" }}'
 oc process -f https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/hac-proxy.yaml -n ${NAMESPACE} -p NAMESPACE=${NAMESPACE} -p ENV_NAME=${ENV_NAME} -p HOSTNAME=${HOSTNAME} | oc create -f -
 
+# Omit some default bonfire frontend dependencies
+export BONFIRE_FRONTEND_DEPENDENCIES=chrome-service,insights-chrome
+
 # Deploy hac-dev
 echo "Deploy hac-dev"
-bonfire deploy -c "$CONFIG_DIR/config.yaml" \
-        hac \
+bonfire deploy hac \
         --frontends true \
         --source=appsre \
         --clowd-env ${ENV_NAME} \
-        --set-image-tag ${CHROME_IMAGE}=${CHROME_TAG} \
         --namespace ${NAMESPACE} \
+        --set-image-tag quay.io/redhat-services-prod/hcc-platex-services/chrome-service=latest \
         --timeout 1200
+
+# Hacks for clowder and keycloak integration
+oc get clowdenvironment $ENV_NAME -o json | jq '.spec.disabled=true' | oc apply -f -
+KC_URL=$(echo $HAC_KC_SSO_URL | sed -s 's/\/auth\///')
+oc get deployment $ENV_NAME-mbop -o json | \
+  jq --arg url $KC_URL --arg user $HAC_KC_USERNAME --arg pass $HAC_KC_PASSWORD \
+    '(.spec.template.spec.containers[].env=[
+     {"name": "KEYCLOAK_SERVER", "value": $url},
+     {"name": "KEYCLOAK_USERNAME", "value": $user},
+     {"name": "KEYCLOAK_PASSWORD", "value": $pass},
+     {"name": "KEYCLOAK_VERSION", "value": "23.0.1"}])' | oc replace -f -
+oc rollout status deployment $ENV_NAME-mbop
+
+# workaround for BETA flag being used on testing env (eph env)
+oc get frontend hac-dev --output json | jq '.spec.frontend.paths += ["/beta/api/plugins/hac-dev"]' | oc apply -f -
+oc get frontend hac-core --output json | jq '.spec.frontend.paths += ["/beta/apps/hac-core"]' | oc apply -f -
+
+oc rollout status deployment hac-dev-frontend
+oc rollout status deployment hac-core-frontend
 
 # Call the keycloak API and add a user
 B64_USER=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.username'| tr -d '"')
 B64_PASS=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.password' | tr -d '"')
 
+CYPRESS_USERNAME="e2e-hac-"`echo ${B64_USER} | base64 -d`
+ENCODED_CYPRESS_USERNAME=`echo -n ${CYPRESS_USERNAME} | base64 -w 0`
+
 # These ENVs are populated in the Jenkins job by Vault secrets
 curl -o keycloak.py https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/keycloak.py
-python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $B64_USER $B64_PASS $HAC_KC_REGISTRATION
+python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $ENCODED_CYPRESS_USERNAME $B64_PASS $HAC_KC_REGISTRATION
 
-export CYPRESS_PERIODIC_RUN CYPRESS_HAC_BASE_URL CYPRESS_USERNAME CYPRESS_PASSWORD CYPRESS_RP_TOKEN
+export CYPRESS_PERIODIC_RUN CYPRESS_HAC_BASE_URL CYPRESS_USERNAME CYPRESS_PASSWORD CYPRESS_RP_TOKEN CYPRESS_SSO_URL
 CYPRESS_PERIODIC_RUN=true
-CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/hac/stonesoup
-CYPRESS_USERNAME=`echo ${B64_USER} | base64 -d`
+CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/application-pipeline
 CYPRESS_PASSWORD=`echo ${B64_PASS} | base64 -d`
 CYPRESS_RP_TOKEN=${CYPRESS_RP_HAC}
+CYPRESS_SSO_URL=${HAC_KC_SSO_URL}
 
 set +e
 # Run Cypress Tests

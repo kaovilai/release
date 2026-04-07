@@ -9,13 +9,13 @@ filters:
     approvers:
     - empovit
     - fabiendupont
-    - mresvanis
-    - sagidayan
+    - wabouhamad
+    - ybettan
     reviewers:
     - empovit
     - fabiendupont
-    - mresvanis
-    - sagidayan
+    - wabouhamad
+    - ybettan
   ^Dockerfile\..*:
     labels:
     - downstream-change-needed

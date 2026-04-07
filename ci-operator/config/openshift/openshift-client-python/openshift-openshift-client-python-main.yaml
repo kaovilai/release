@@ -1,25 +1,19 @@
 base_images:
-  origin_4.13_cli:
-    name: "4.13"
-    namespace: origin
-    tag: cli
   os:
     name: centos
-    namespace: origin
-    tag: stream8
+    namespace: openshift
+    tag: stream9
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/Dockerfile
-  from: os
-  inputs:
-    origin_4.13_cli:
-      as:
-      - registry.ci.openshift.org/origin/4.13:cli
-  to: openshift-client-python
+  items:
+  - dockerfile_path: images/Dockerfile
+    from: os
+    to: openshift-client-python
 promotion:
-  namespace: dpcr
-  tag: latest
+  to:
+  - namespace: dpcr
+    tag: latest
 resources:
   '*':
     limits:

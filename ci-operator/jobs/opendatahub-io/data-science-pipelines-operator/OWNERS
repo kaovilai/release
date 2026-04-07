@@ -5,18 +5,19 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- accorvin
-- anishasthana
+- alyssacgoins
 - gmfrasca
-- gregsheremeta
-- harshad16
+- hbelmiro
 - humairak
-- rimolive
+- mprahl
+- nsingla
 options: {}
 reviewers:
-- dharmitd
+- alyssacgoins
 - gmfrasca
-- gregsheremeta
-- harshad16
+- hbelmiro
 - humairak
-- rimolive
+- mprahl
+- nsingla
+- sduvvuri1603
+- vaniharipriya

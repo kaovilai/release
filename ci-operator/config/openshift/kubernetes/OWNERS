@@ -7,16 +7,23 @@
 filters:
   .*:
     approvers:
+    - benluddy
+    - bertinatto
     - deads2k
-    - mfojtik
-    - soltysh
-    - sttts
+    - jacobsee
+    - jerpeter1
+    - jubittajohn
+    - p0lyn0mial
     - tkashem
     reviewers:
+    - benluddy
+    - bertinatto
     - deads2k
-    - mfojtik
-    - soltysh
-    - sttts
+    - jacobsee
+    - jerpeter1
+    - jubittajohn
+    - p0lyn0mial
+    - tkashem
   ^\.go.(mod|sum)$:
     labels:
     - vendor-update

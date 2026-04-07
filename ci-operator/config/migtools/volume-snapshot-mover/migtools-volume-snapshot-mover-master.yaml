@@ -2,13 +2,15 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: rhel-9-release-golang-1.19-openshift-4.15
 images:
-- dockerfile_path: Dockerfile
-  to: volume-snapshot-mover
+  items:
+  - dockerfile_path: Dockerfile
+    to: volume-snapshot-mover
 promotion:
-  name: volume-snapshot-mover
-  namespace: konveyor
+  to:
+  - name: volume-snapshot-mover
+    namespace: konveyor
 releases:
   latest:
     release:

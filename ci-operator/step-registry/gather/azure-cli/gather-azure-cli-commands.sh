@@ -16,6 +16,16 @@ chmod ug+x /tmp/bin/jq
 curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
 chmod ug+x /tmp/bin/oc
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
@@ -77,6 +87,19 @@ EXIT_CODE=0
 # This allows us to continue and try to gather other boot logs.
 set +o errexit
 set -o pipefail
+
+echo "$(date -u --rfc-3339=seconds) - Gathering disk metrics"
+for VM_NAME in $(sort < "${TMPDIR}/azure-instance-names.txt" | uniq)
+do
+  metrics=( "OS Disk Queue Depth" "OS Disk Write Bytes/Sec" )
+  for m in "${metrics[@]}";
+  do
+    echo "$(date -u --rfc-3339=seconds) - Gathering metric $m for VM ${VM_NAME}"
+    az monitor metrics list --resource-type "Microsoft.Compute/virtualMachines" --resource ${VM_NAME} --resource-group "${RESOURCE_GROUP}" --offset 3h --metrics "$m" --subscription $SUBSCRIPTION_ID > $OUTPUT_DIR/disk-$VM_NAME-${m//[^[:alnum:]]/""}.json
+  done
+done
+echo "$(date -u --rfc-3339=seconds) - Gathering disk metrics complete"
+
 for VM_NAME in $(sort < "${TMPDIR}/azure-instance-names.txt" | uniq)
 do
   echo "Gathering console logs for ${VM_NAME} in resource group ${RESOURCE_GROUP}"

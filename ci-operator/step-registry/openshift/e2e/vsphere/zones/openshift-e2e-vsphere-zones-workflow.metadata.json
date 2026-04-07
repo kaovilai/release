@@ -2,9 +2,8 @@
 	"path": "openshift/e2e/vsphere/zones/openshift-e2e-vsphere-zones-workflow.yaml",
 	"owners": {
 		"approvers": [
-			"rvanderp3",
-			"jcpowermac",
-			"bostrt"
+			"vsphere-approvers",
+			"storage-approvers"
 		]
 	}
 }

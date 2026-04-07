@@ -1,34 +1,34 @@
 base_images:
-  ocp_builder_rhel-8-base-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.14
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 build_root:
   from_repository: true
 images:
-- context_dir: base
-  dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_builder_rhel-8-base-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.14
-  to: base
-- context_dir: egress/router
-  from: base
-  to: egress-router
-- context_dir: egress/http-proxy
-  from: base
-  to: egress-http-proxy
-- context_dir: egress/dns-proxy
-  from: base
-  to: egress-dns-proxy
-- context_dir: ipfailover/keepalived
-  from: base
-  to: keepalived-ipfailover
+  items:
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel
+    to: base
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel9
+    to: base-rhel9
+  - context_dir: egress/router
+    from: base
+    to: egress-router
+  - context_dir: egress/http-proxy
+    from: base
+    to: egress-http-proxy
+  - context_dir: egress/dns-proxy
+    from: base
+    to: egress-dns-proxy
+  - context_dir: ipfailover/keepalived
+    from: base
+    to: keepalived-ipfailover
 promotion:
-  disabled: true
-  name: "4.14"
-  namespace: ocp
+  to:
+  - name: "4.14"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -47,12 +47,22 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
+- as: unit
+  commands: go test -race ./...
+  container:
+    from: src
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

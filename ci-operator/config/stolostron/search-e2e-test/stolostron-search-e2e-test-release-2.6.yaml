@@ -5,11 +5,13 @@ build_root:
     namespace: stolostron
     tag: nodejs14-linux
 images:
-- dockerfile_path: Dockerfile
-  to: search-e2e
+  items:
+  - dockerfile_path: Dockerfile
+    to: search-e2e
 promotion:
-  name: "2.6"
-  namespace: stolostron
+  to:
+  - name: "2.6"
+    namespace: stolostron
 resources:
   '*':
     requests:

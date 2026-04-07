@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
     openshift.io/description: Automation ServiceAccounts for CNF CI
     openshift.io/display-name: CNF CI
   name: cnf-ci
@@ -38,5 +39,5 @@ roleRef:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: cnf-ci-admins
+    name: cnf-ci
     namespace: cnf-ci

@@ -1,0 +1,21 @@
+{
+	"path": "hypershift/kubevirt/baremetalds/redhat-operators/hypershift-kubevirt-baremetalds-redhat-operators-ref.yaml",
+	"owners": {
+		"approvers": [
+			"nirarg",
+			"nunnatsa",
+			"qinqon",
+			"orenc1",
+			"LiangquanLi930",
+			"maiqueb"
+		],
+		"reviewers": [
+			"nirarg",
+			"nunnatsa",
+			"qinqon",
+			"orenc1",
+			"LiangquanLi930",
+			"maiqueb"
+		]
+	}
+}

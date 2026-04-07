@@ -4,13 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save stacks events
-trap 'save_stack_events_to_artifacts' EXIT TERM INT
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; save_stack_events_to_artifacts' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION="${LEASED_RESOURCE}"
+REGION=${REGION:-$LEASED_RESOURCE}
 
 function save_stack_events_to_artifacts()
 {
@@ -24,14 +28,50 @@ if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
 fi
 
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 # 1. get vpc id and public subnet
-VpcId=$(cat "${SHARED_DIR}/vpc_id")
+if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]] && [[ ! -f "${SHARED_DIR}/vpc_info.json" ]]; then
+  if [[ ! -f ${SHARED_DIR}/metadata.json ]]; then
+    echo "no vpc_id or public_subnet_ids found in ${SHARED_DIR} - and no metadata.json found, exiting"
+    exit 1
+  fi
+  # for OCP
+  echo "Reading infra id from file metadata.json"
+  infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
+  vpc_name="${infra_id}-vpc"
+  public_subnet_name="${infra_id}-subnet-public-${REGION}a"
+  echo "Looking up IDs for VPC ${vpc_name} and subnet ${public_subnet_name}"
+  VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${vpc_name} --query 'Vpcs[0].VpcId' --output text)
+  ### This finds any public subnet, as
+  ### * we can't guess which azs are picked (public_subnet_name guesses its a)
+  ### * pre-4.16 its ${infra_id}-subnet-public-${REGION}[abc...] and later 
+  ### its ${infra_id}-public-${REGION}[abc...]
+  ### any public subnet would work here
+  PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
+  ### This SG is created by AWS IPI since 4.18
+  ### Previous versions or Byo-VPC may not have it created - 
+  ### CloudFormation has logic to ignore it if its set to "None"
+  ControlPlaneSecurityGroup=$(aws --region ${REGION} ec2 describe-security-groups --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=${infra_id}-controlplane" --query 'SecurityGroups[0].GroupId' --output text)
+elif [[ -f "${SHARED_DIR}/vpc_info.json" ]]; then
+  VpcId=$(jq -r '.vpc_id' "${SHARED_DIR}/vpc_info.json")
+  PublicSubnet=$(jq -r '.subnets[0].ids[0].public' "${SHARED_DIR}/vpc_info.json")
+  ControlPlaneSecurityGroup="None"
+else
+  VpcId=$(cat "${SHARED_DIR}/vpc_id")
+  PublicSubnet=$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')
+  ControlPlaneSecurityGroup="None"
+fi
+
 echo "VpcId: $VpcId"
-
-PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
 echo "PublicSubnet: $PublicSubnet"
+echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
+EnableIpv6="no"
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+    echo "IP_FAMILY: $IP_FAMILY"
+    EnableIpv6="yes"
+    VpcIpv6Cidr=$(jq -r '.vpc_ipv6_cidr //"2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128"' "${SHARED_DIR}/vpc_info.json")
+fi
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 stack_name="${CLUSTER_NAME}-bas"
 s3_bucket_name="${CLUSTER_NAME}-s3"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
@@ -43,8 +83,50 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   if [[ ! -f "${bastion_ignition_file}" ]]; then
     echo "'${bastion_ignition_file}' not found , abort." && exit 1
   fi
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o /tmp/fedora-coreos-stable.json
-  ami_id=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fedora-coreos-stable.json)
+  
+  #
+  # Use FCOS as bastion host, as systemd-resolved is only available in FCOS and it's involved in step bastion-dnsmasq,
+  #   which is used by particular features (e.g. Custom DNS feature) 
+  # But FCOS is not available in AWS GovCloud, so:
+  #  a) use fixed FCOS AMI in GovCloud regions if aws-usgov-qe profile is used, this allow to test Custom DNS feature on GovCloud
+  #  b) For other cases: aws-usgov cluster but not using aws-usgov-qe profile, still use rhcos images
+  #
+  if [[ "${CLUSTER_PROFILE_NAME:-}" == "aws-usgov-qe" ]]; then
+    # the images are copied from on Jul. 3 2025
+    # curl -sk https://builds.coreos.fedoraproject.org/streams/stable.json | jq -r '.architectures.x86_64.artifacts.aws.formats."vmdk.xz".disk.location'
+    if [[ "${REGION}" == "us-gov-east-1" ]]; then
+      ami_id="ami-086698edfd9b6933d"
+    elif [[ "${REGION}" == "us-gov-west-1" ]]; then
+      ami_id="ami-01cdd82c43022852b"
+    fi
+  elif [[ "${CLUSTER_PROFILE_NAME:-}" == "aws-eusc" ]]; then
+    # Fedora CoreOS 43.20260301.3.1 x86_64 bastion host AMI for EUSC
+    # Source AMI: ami-06cac406e53158eb6 (us-east-1)
+    if [[ "${REGION}" == "eusc-de-east-1" ]]; then
+      ami_id="ami-0e43802c8b4ad242e"
+    fi
+  else
+    if [[ "${CLUSTER_TYPE}" == "aws-usgov" ]]; then
+        bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
+    else
+        bastion_image_list_url="https://builds.coreos.fedoraproject.org/streams/stable.json"
+    fi
+        
+    if ! curl -sSLf --retry 3 --connect-timeout 30 --max-time 60 -o /tmp/bastion-image.json "${bastion_image_list_url}"; then
+        echo "ERROR: Failed to download RHCOS image list from ${bastion_image_list_url}" >&2
+        exit 1
+    fi
+    
+    if ! jq empty /tmp/bastion-image.json &>/dev/null; then
+        echo "ERROR: Downloaded file is not valid JSON" >&2
+        exit 1
+    fi
+
+    ami_id=$(jq -r --arg r ${REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
+    if [[ ${ami_id} == "" ]]; then
+        echo "Bastion host AMI was NOT found in region ${REGION}, exit now." && exit 1
+    fi
+  fi  
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
   aws --region $REGION s3 mb "s3://${s3_bucket_name}"
@@ -64,6 +146,10 @@ BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
 if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
+# EUSC bastion AMI includes ephemeral0 instance store, requires instance-store-capable instance type
+elif [[ "${REGION}" == "eusc-de-east-1" ]]; then
+    # EUSC supports m6id (6th gen) but not m5d (5th gen) instance types
+    BastionHostInstanceType="m6id.large"
 fi
 
 ## ----------------------------------------------------------------
@@ -79,6 +165,11 @@ Parameters:
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
     Default: 10.0.0.0/16
     Description: CIDR block for VPC.
+    Type: String
+  VpcIpv6Cidr:
+    ConstraintDescription: IPv6 CIDR block parameter
+    Default: 2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128
+    Description: IPv6 CIDR block for VPC.
     Type: String
   VpcId:
     Description: The VPC-scoped resources will belong to this VPC.
@@ -97,6 +188,15 @@ Parameters:
   PublicSubnet:
     Description: The subnets (recommend public) to launch the registry nodes into
     Type: AWS::EC2::Subnet::Id
+  ControlPlaneSecurityGroup:
+    Description: Control plane security group
+    Type: String
+  EnableIpv6:
+    Default: "no"
+    AllowedValues:
+    - "yes"
+    - "no"
+    Type: String
   BastionHostInstanceType:
     Default: t2.medium
     Type: String
@@ -124,6 +224,8 @@ Metadata:
 
 Conditions:
   UseIgnition: !Not [ !Equals ["NA", !Ref BastionIgnitionLocation] ]
+  HasControlPlaneSecurityGroupSet: !Not [ !Equals ["None", !Ref ControlPlaneSecurityGroup] ]
+  AssignIpv6: !Equals ["yes", !Ref EnableIpv6]
 
 Resources:
   BastionIamRole:
@@ -159,11 +261,11 @@ Resources:
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Bastion Host Security Group
+      GroupDescription: Bastion Host Security Group for ipv4
       SecurityGroupIngress:
       - IpProtocol: icmp
-        FromPort: 0
-        ToPort: 0
+        FromPort: -1
+        ToPort: -1
         CidrIp: !Ref VpcCidr
       - IpProtocol: tcp
         FromPort: 22
@@ -175,10 +277,6 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 3128
-        ToPort: 3128
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 3129
         ToPort: 3129
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
@@ -197,6 +295,49 @@ Resources:
         FromPort: 8080
         ToPort: 8080
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 9095
+        ToPort: 9095
+        CidrIp: 0.0.0.0/0
+      VpcId: !Ref VpcId
+  BastionSecurityGroupIpv6:
+    Condition: AssignIpv6
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion Host Security Group for ipv6
+      SecurityGroupIngress:
+      - IpProtocol: icmpv6
+        FromPort: -1
+        ToPort: -1
+        CidrIpv6: !Ref VpcIpv6Cidr
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 3128
+        ToPort: 3129
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 5000
+        ToPort: 5000
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 6001
+        ToPort: 6002
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 9095
+        ToPort: 9095
+        CidrIpv6: ::/0
       VpcId: !Ref VpcId
   BastionInstance:
     Type: AWS::EC2::Instance
@@ -207,8 +348,11 @@ Resources:
       NetworkInterfaces:
       - AssociatePublicIpAddress: "True"
         DeviceIndex: "0"
+        Ipv6AddressCount: !If [ "AssignIpv6", 1, !Ref "AWS::NoValue"]
         GroupSet:
-        - !GetAtt BastionSecurityGroup.GroupId
+          - !GetAtt BastionSecurityGroup.GroupId
+          - !If [ "AssignIpv6", !GetAtt BastionSecurityGroupIpv6.GroupId, !Ref "AWS::NoValue"]
+          - !If [ "HasControlPlaneSecurityGroupSet", !Ref "ControlPlaneSecurityGroup", !Ref "AWS::NoValue"]
         SubnetId: !Ref "PublicSubnet"
       Tags:
       - Key: Name
@@ -218,11 +362,11 @@ Resources:
           - "UseIgnition"
           - - DeviceName: /dev/xvda
               Ebs:
-                VolumeSize: "120"
+                VolumeSize: "500"
                 VolumeType: gp2
           - - DeviceName: /dev/sda1
               Ebs:
-                VolumeSize: "120"
+                VolumeSize: "500"
                 VolumeType: gp2
       UserData:
         !If
@@ -260,9 +404,12 @@ aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
         ParameterKey=VpcId,ParameterValue="${VpcId}"  \
+        ParameterKey=VpcIpv6Cidr,ParameterValue="${VpcIpv6Cidr-2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128}"  \
         ParameterKey=BastionHostInstanceType,ParameterValue="${BastionHostInstanceType}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \
+        ParameterKey=ControlPlaneSecurityGroup,ParameterValue="${ControlPlaneSecurityGroup}" \
+        ParameterKey=EnableIpv6,ParameterValue="${EnableIpv6}" \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=BastionIgnitionLocation,ParameterValue="${ign_location}"  &
 
@@ -273,8 +420,6 @@ aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name 
 wait "$!"
 echo "Waited for stack"
 
-echo "$stack_name" > "${SHARED_DIR}/bastion_host_stack_name"
-
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
 --query 'Stacks[].Outputs[?OutputKey == `BastionInstanceId`].OutputValue' --output text)"
 echo "Instance ${INSTANCE_ID}"
@@ -282,6 +427,13 @@ echo "Instance ${INSTANCE_ID}"
 # to allow log collection during gather:
 # append to proxy bastion host ID to "${SHARED_DIR}/aws-instance-ids.txt"
 echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-ids.txt"
+
+if [[ "${EnableIpv6}" == "yes" ]]; then
+    BASTION_HOST_IPv6="$(aws --region "${REGION}" ec2 describe-instances --instance-ids ${INSTANCE_ID} \
+--query "Reservations[*].Instances[].Ipv6Address" --output text)"
+    echo "Bastion IPv6: ${BASTION_HOST_IPv6}"
+    echo "${BASTION_HOST_IPv6}" > "${SHARED_DIR}/bastion_ipv6_address"
+fi
 
 BASTION_HOST_PUBLIC_DNS="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
   --query 'Stacks[].Outputs[?OutputKey == `PublicDnsName`].OutputValue' --output text)"
@@ -294,12 +446,18 @@ echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/proxyip"
 
-PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+if [[ "${CUSTOM_PROXY_CREDENTIAL}" == "true" ]]; then
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/custom_proxy_creds)
+else
+    PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
+fi
 PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
 PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
+PROXY_PRIVATE_HTTPS_URL="https://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3129"
 
 echo "${PROXY_PUBLIC_URL}" > "${SHARED_DIR}/proxy_public_url"
 echo "${PROXY_PRIVATE_URL}" > "${SHARED_DIR}/proxy_private_url"
+echo "${PROXY_PRIVATE_HTTPS_URL}" > "${SHARED_DIR}/proxy_private_https_url"
 
 MIRROR_REGISTRY_URL="${BASTION_HOST_PUBLIC_DNS}:5000"
 echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"

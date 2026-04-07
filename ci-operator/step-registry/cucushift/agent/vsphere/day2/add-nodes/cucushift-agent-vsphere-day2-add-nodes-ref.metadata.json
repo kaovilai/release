@@ -1,0 +1,15 @@
+{
+	"path": "cucushift/agent/vsphere/day2/add-nodes/cucushift-agent-vsphere-day2-add-nodes-ref.yaml",
+	"owners": {
+		"approvers": [
+			"mhanss",
+			"pamoedom"
+		],
+		"reviewers": [
+			"mhanss",
+			"pamoedom",
+			"bmanzari",
+			"zniu1011"
+		]
+	}
+}

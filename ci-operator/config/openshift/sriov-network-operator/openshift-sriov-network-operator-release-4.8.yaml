@@ -3,10 +3,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.8
   sriov-cni:
     name: "4.8"
     namespace: ocp
@@ -27,32 +27,24 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-8-release-golang-1.15-openshift-4.8
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-  to: sriov-network-webhook
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+    from: base
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.rhel7
+    from: base
+    to: sriov-network-webhook
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: sriov-network-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
   substitutions:
   - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.8
     with: pipeline:sriov-dp-admission-controller
@@ -69,8 +61,9 @@ operator:
   - pullspec: quay.io/openshift/origin-sriov-network-operator:4.8
     with: pipeline:sriov-network-operator
 promotion:
-  name: "4.8"
-  namespace: ocp
+  to:
+  - name: "4.8"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -105,9 +98,9 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator

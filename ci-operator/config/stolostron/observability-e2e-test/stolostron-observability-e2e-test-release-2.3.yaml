@@ -9,12 +9,14 @@ build_root:
     namespace: stolostron
     tag: go1.17-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: observability-e2e-test
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: observability-e2e-test
 promotion:
-  name: "2.3"
-  namespace: stolostron
+  to:
+  - name: "2.3"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -43,7 +45,7 @@ tests:
 - as: test-e2e
   run_if_changed: ^(pkg/.*|Makefile|Dockerfile|go\.mod|go\.sum)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: run-e2e
       cli: latest

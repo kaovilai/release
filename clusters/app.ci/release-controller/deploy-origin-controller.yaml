@@ -17,7 +17,7 @@ spec:
   host: origin-release.apps.ci.l2s4.p1.openshiftapps.com
   tls:
     insecureEdgeTerminationPolicy: Redirect
-    termination: Edge
+    termination: edge
   to:
     kind: Service
     name: release-controller-api
@@ -62,7 +62,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller
   namespace: ci
 spec:
@@ -76,18 +79,40 @@ spec:
         app: release-controller
     spec:
       containers:
+      - args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        command:
+        - /git-sync
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        name: git-sync
+        resources:
+          requests:
+            cpu: '0.5'
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
       - command:
         - /usr/bin/release-controller
         - --release-namespace=origin
         - --prow-config=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --job-config=/etc/job-config
+        - --job-config=/var/repo/release/ci-operator/jobs
         - --prow-namespace=ci
         - --job-namespace=ci-release
-        - --tools-image-stream-tag=4.6:tests
+        - --tools-image-stream-tag=release-controller-bootstrap:tools
         - --release-architecture=amd64
         - -v=4
-        image: release-controller:latest
+        - --manifest-list-mode
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -106,14 +131,10 @@ spec:
         - mountPath: /etc/config
           name: config
           readOnly: true
-        - mountPath: /etc/job-config
-          name: job-config
-          readOnly: true
+        - mountPath: /var/repo
+          name: release
         - mountPath: /etc/github
           name: oauth
-          readOnly: true
-        - mountPath: /etc/bugzilla
-          name: bugzilla
           readOnly: true
         - mountPath: /etc/jira
           name: jira
@@ -124,67 +145,44 @@ spec:
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
+      initContainers:
+      - args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        command:
+        - /git-sync
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        name: git-sync-init
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
       serviceAccountName: release-controller
       volumes:
       - configMap:
           defaultMode: 420
           name: config
         name: config
-      - name: job-config
-        projected:
-          sources:
-          - configMap:
-              name: job-config-misc
-          - configMap:
-              name: job-config-master-periodics
-          - configMap:
-              name: job-config-master-postsubmits
-          - configMap:
-              name: job-config-master-presubmits
-          - configMap:
-              name: job-config-1.x
-          - configMap:
-              name: job-config-2.x
-          - configMap:
-              name: job-config-3.x
-          - configMap:
-              name: job-config-4.0
-          - configMap:
-              name: job-config-4.1
-          - configMap:
-              name: job-config-4.10
-          - configMap:
-              name: job-config-4.11
-          - configMap:
-              name: job-config-4.12
-          - configMap:
-              name: job-config-4.13
-          - configMap:
-              name: job-config-4.14
-          - configMap:
-              name: job-config-4.2
-          - configMap:
-              name: job-config-4.3
-          - configMap:
-              name: job-config-4.4
-          - configMap:
-              name: job-config-4.5
-          - configMap:
-              name: job-config-4.6
-          - configMap:
-              name: job-config-4.7
-          - configMap:
-              name: job-config-4.8
-          - configMap:
-              name: job-config-4.9
+      - emptyDir: {}
+        name: release
       - name: oauth
         secret:
           defaultMode: 420
           secretName: github-credentials-openshift-merge-robot
-      - name: bugzilla
-        secret:
-          defaultMode: 420
-          secretName: bugzilla-credentials-openshift-bugzilla-robot
       - name: jira
         secret:
           defaultMode: 420
@@ -197,6 +195,21 @@ spec:
         secret:
           defaultMode: 420
           secretName: release-controller-kubeconfigs
+      - emptyDir: {}
+        name: home
+      - emptyDir: {}
+        name: oc-cache
+      - name: git-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: .git-credentials
+            path: .git-credentials
+          secretName: release-controller-oc-git-credentials
+      - name: pull-secret
+        secret:
+          defaultMode: 420
+          secretName: release-controller-oc-pull-secret
 ---
 #---------------------------------------------------------------------------------
 # origin_resources.py added the following resource
@@ -206,7 +219,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-api
   namespace: ci
 spec:
@@ -225,13 +241,15 @@ spec:
         - --release-namespace=origin
         - --prow-namespace=ci
         - --job-namespace=ci-release
-        - --tools-image-stream-tag=4.6:tests
+        - --tools-image-stream-tag=release-controller-bootstrap:tools
         - --release-architecture=amd64
         - --enable-jira
-        - --jira-endpoint=https://issues.redhat.com
-        - --jira-bearer-token-file=/etc/jira/api
+        - --jira-endpoint=https://redhat.atlassian.net
+        - --jira-username=brawilli@redhat.com
+        - --jira-password-file=/etc/jira/password
         - -v=4
-        image: release-controller-api:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -247,19 +265,43 @@ spec:
           periodSeconds: 3
           timeoutSeconds: 600
         volumeMounts:
-        - mountPath: /etc/kubeconfigs
-          name: release-controller-kubeconfigs
-          readOnly: true
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/kubeconfigs
+          name: release-controller-kubeconfigs
+          readOnly: true
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
       serviceAccountName: release-controller
       volumes:
-      - name: release-controller-kubeconfigs
-        secret:
-          defaultMode: 420
-          secretName: release-controller-kubeconfigs
       - name: jira
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          secretName: release-controller-kubeconfigs
+      - emptyDir: {}
+        name: home
+      - emptyDir: {}
+        name: oc-cache
+      - name: git-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: .git-credentials
+            path: .git-credentials
+          secretName: release-controller-oc-git-credentials
+      - name: pull-secret
+        secret:
+          defaultMode: 420
+          secretName: release-controller-oc-pull-secret

@@ -8,16 +8,12 @@ filters:
   .*:
     approvers:
     - ffromani
-    - jlojosnegros
-    - marioferh
     - marsik
     - swatisehgal
     - tal-or
     - yanirq
     reviewers:
     - ffromani
-    - jlojosnegros
-    - marioferh
     - marsik
     - swatisehgal
     - tal-or

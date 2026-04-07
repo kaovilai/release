@@ -2,13 +2,10 @@
 	"path": "windows/unit/wicd/windows-unit-wicd-ref.yaml",
 	"owners": {
 		"approvers": [
-			"aravindhp",
-			"sebsoto"
+			"winc-approvers"
 		],
 		"reviewers": [
-			"aravindhp",
-			"sebsoto",
-			"mansikulkarni96"
+			"winc-reviewers"
 		]
 	}
 }

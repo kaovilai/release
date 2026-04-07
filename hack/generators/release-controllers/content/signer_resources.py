@@ -1,10 +1,9 @@
-
 def generate_signer_resources(gendoc):
     resources = gendoc
     context = gendoc.context
 
     resources.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-signer',
@@ -53,7 +52,10 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
             'name': 'release-controller-signer',
             'namespace': 'ci',
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image"}]'
+                'keel.sh/policy': 'force',
+                'keel.sh/matchTag': 'true',
+                'keel.sh/trigger': 'poll',
+                'keel.sh/pollSchedule': '@every 5m'
             }
         },
         'spec': {
@@ -89,7 +91,8 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                     }],
                     'containers': [{
                         'name': 'controller',
-                        'image': 'release-controller:latest',
+                        'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
+                        'imagePullPolicy': 'Always',
                         'volumeMounts': [{
                             'name': 'publisher',
                             'mountPath': '/etc/release-controller/publisher',
@@ -108,11 +111,11 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                             '--release-namespace=ocp',
                             '--release-namespace=origin',
                             '--job-namespace=ci-release',
-                            '--tools-image-stream-tag=4.6:tests',
+                            '--tools-image-stream-tag=release-controller-bootstrap:tools',
                             '--audit=gs://openshift-ci-release/releases',
                             '--sign=/etc/release-controller/signer/openshift-ci.gpg',
                             '--audit-gcs-service-account=/etc/release-controller/publisher/service-account.json',
-                            '-v=4'
+                            '-v=6'
                         ]
                     }]
                 }

@@ -35,3 +35,9 @@ plugins:
     - owners-label
     - wip
     - yuks
+triggers:
+- repos:
+  - quay/container-security-operator
+  trusted_apps:
+  - dependabot
+  - openshift-merge-bot

@@ -5,13 +5,15 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- fabiendupont
-- kwozyman
-- sagidayan
+- empovit
+- ggordanired
+- tomernewman
+- vtruhpon
+- wabouhamad
 options: {}
 reviewers:
 - empovit
-- fabiendupont
-- kwozyman
-- mresvanis
-- sagidayan
+- ggordanired
+- tomernewman
+- vtruhpon
+- wabouhamad

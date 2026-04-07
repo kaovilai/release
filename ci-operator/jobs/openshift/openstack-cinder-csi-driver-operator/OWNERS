@@ -7,25 +7,23 @@
 approvers:
 - bertinatto
 - dobsonj
-- emilienm
 - gnufied
+- gryf
 - jsafrane
 - mandre
-- maysamacedo
-- mdbooth
-- pierreprinetti
+- mpatlasov
+- romanbednar
 - stephenfin
 - tsmetana
 options: {}
 reviewers:
 - bertinatto
 - dobsonj
-- emilienm
 - gnufied
+- gryf
 - jsafrane
 - mandre
-- maysamacedo
-- mdbooth
-- pierreprinetti
+- mpatlasov
+- romanbednar
 - stephenfin
 - tsmetana

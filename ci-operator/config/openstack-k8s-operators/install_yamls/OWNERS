@@ -7,29 +7,24 @@
 approvers:
 - abays
 - dprince
-- fao89
 - fmount
 - fultonj
 - gibizer
 - karelyatin
-- olliewalsh
 - raukadah
-- sandeepyadav93
 - slagle
 - stuggi
 - viroel
 options: {}
 reviewers:
 - abays
+- cjeanner
 - dprince
-- fao89
 - fmount
 - fultonj
 - gibizer
 - karelyatin
-- olliewalsh
 - raukadah
-- sandeepyadav93
 - slagle
 - stuggi
 - viroel

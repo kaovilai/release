@@ -1,0 +1,25 @@
+{
+	"path": "hypershift/mce/ibmz/destroy/hcp/hypershift-mce-ibmz-destroy-hcp-ref.yaml",
+	"owners": {
+		"approvers": [
+			"csrwng",
+			"enxebre",
+			"sjenning",
+			"v78singh",
+			"phani2898",
+			"veera-damisetti",
+			"LiangquanLi930",
+			"jpattara"
+		],
+		"reviewers": [
+			"csrwng",
+			"enxebre",
+			"sjenning",
+			"v78singh",
+			"phani2898",
+			"veera-damisetti",
+			"LiangquanLi930",
+			"jpattara"
+		]
+	}
+}

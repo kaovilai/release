@@ -68,6 +68,7 @@ default:
       previously:
         - name: close/unresolved
         - name: invalid
+          deleteAfter: 2026-04-02T00:00:00Z
         - name: wontfix
       target: both
       addedBy: humans
@@ -346,6 +347,16 @@ default:
       name: tide/merge-blocker
       target: issues
       addedBy: humans
+    - color: e11d21
+      description: Indicates if the issuer of the label is OK with the policy.
+      name: acknowledge-critical-fixes-only
+      target: prs
+      addedBy: humans
+    - color: e11d21
+      description: Indicates that the PR approves the stability in a repo
+      name: stability-fix-approved
+      target: prs
+      addedBy: label
     - color: f9d0c4
       description: ¯\\\_(ツ)_/¯
       name: "¯\\_(ツ)_/¯"
@@ -476,10 +487,20 @@ default:
         - name: group-lead-approved
       target: prs
       addedBy: humans
+    - color: fef2c0
+      description: Indicates that the referenced Jira bug does not require a dependent bug.
+      name: jira/skip-dependent-bug-check
+      target: prs
+      addedBy: humans
 
 orgs:
   openshift:
     labels:
+      - color: 0FFA16
+        description: Signifies that the PR passed pre-merge verification criteria
+        name: verified
+        target: prs
+        addedBy: prow
       - color: 0FFA16
         description: Signifies that QE has signed off on this PR
         name: qe-approved
@@ -537,29 +558,14 @@ orgs:
         addedBy: label
 
 repos:
-  openshift/assisted-installer:
-    labels:
-      - color: e11d21
-        description: Requires updating downstream image
-        name: downstream-change-needed
-        target: both
-        addedBy: label
-  openshift/assisted-installer-agent:
-    labels:
-      - color: e11d21
-        description: Requires updating downstream image
-        name: downstream-change-needed
-        target: both
-        addedBy: label
-  openshift/assisted-server:
-    labels:
-      - color: e11d21
-        description: Requires updating downstream image
-        name: downstream-change-needed
-        target: both
-        addedBy: label
   openshift/release:
     labels:
+      - color: ff0000
+        description: Critical priority - CI infrastructure is broken or severely impacted
+        name: priority/ci-critical
+        target: prs
+        prowPlugin: label
+        addedBy: label
       - color: 7057ff
         description: Categorizes an issue as relating to the triage role.
         name: "area/triage"
@@ -729,6 +735,21 @@ repos:
         name: kind/cypress
         target: both
         addedBy: label
+      - color: 00D8FF
+        description: Related to dynamic-demo-plugin
+        name: kind/demo-plugin
+        target: both
+        addedBy: label
+      - color: e11d21
+        description: Categorizes a PR as containing plugin API changes
+        name: plugin-api-changed
+        target: prs
+        addedBy: label
+      - color: 0ffa16
+        description: Indicates a PR with plugin API changes has been approved by an API reviewer
+        name: plugin-api-approved
+        target: prs
+        addedBy: label
   openshift/dynamic-plugin-sdk:
     labels:
       - color: 00D8FF
@@ -787,6 +808,11 @@ repos:
         name: "area/control-plane-operator"
         target: prs
         addedBy: anyone
+      - color: "4b1f79"
+        description: Indicates the PR includes changes for the control plane PKI operator - in an OCP release
+        name: "area/control-plane-pki-operator"
+        target: prs
+        addedBy: anyone
       - color: "5319e7"
         description: Indicates the PR includes changes for documentation
         name: "area/documentation"
@@ -801,6 +827,66 @@ repos:
         description: Indicates the PR includes changes for e2e testing
         name: "area/testing"
         target: prs
+        addedBy: anyone
+      - color: "0b800f"
+        description: Indicates the PR includes changes for CI or tooling
+        name: "area/ci-tooling"
+        target: prs
+        addedBy: anyone
+      - color: "0b800f"
+        description: Indicates the PR includes changes for the API
+        name: "area/api"
+        target: prs
+        addedBy: anyone
+      - color: "d97706"
+        description: Indicates the PR includes changes related to AI - Claude agents, Cursor rules, etc.
+        name: "area/ai"
+        target: prs
+        addedBy: anyone
+      - color: "4b1f79"
+        description: Indicates the PR includes changes related to the Karpenter operator
+        name: "area/karpenter-operator"
+        target: prs
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for AWS (AWSPlatform) platform
+        name: "area/platform/aws"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for Azure (AzurePlatform) platform
+        name: "area/platform/azure"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for GCP (GCPPlatform) platform
+        name: "area/platform/gcp"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for IBMCloud (IBMCloudPlatform) platform
+        name: "area/platform/ibmcloud"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for PowerVS (PowerVSPlatform) platform
+        name: "area/platform/powervs"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for OpenStack (OpenStackPlatform) platform
+        name: "area/platform/openstack"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for KubeVirt (KubevirtPlatform) platform
+        name: "area/platform/kubevirt"
+        target: both
+        addedBy: anyone
+      - color: "1d76db"
+        description: PR/issue for None (NonePlatform) platform - user-supplied infrastructure
+        name: "area/platform/none"
+        target: both
         addedBy: anyone
   operator-framework/operator-lifecycle-manager:
     labels:
@@ -870,8 +956,20 @@ repos:
         name: docs-approved
         target: both
         addedBy: label
+  openshift/oadp-operator:
+    labels:
+      - color: "d4c5f9"
+        description: Issue or PR related to CI
+        name: "area/ci"
+        target: both
+        addedBy: anyone
   openshift/openshift-docs:
     labels:
+      - color: f9d0c4
+        description: Label for PRs submitted by cloud experts
+        name: cloud-experts
+        target: both
+        addedBy: label
       - color: f9d0c4
         description: Label for all CNV PRs
         name: CNV
@@ -961,4 +1059,175 @@ repos:
         description: Label for all Telco PRs
         name: telco
         target: both
+        addedBy: label
+      - color: 5F85B4
+        description: Service Delivery issues that have been reviewed by SRE, PMs, Engineering, QE, etc.
+        name: sme-review-done
+        target: both
+        addedBy: label
+      - color: f9d0c4
+        description: Service Delivery issues that SRE, PMs, QE, engineering, etc. should review
+        name: sme-review-needed
+        target: both
+        addedBy: label
+  openshift/linuxptp-daemon:
+    labels:
+      - color: f9d0c4
+        description: Signifies that no new issues found from PTP framework regression for this PR
+        name: regression_complete
+        target: both
+        addedBy: label
+  openshift/cluster-version-operator:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cloud-provider-aws:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cloud-provider-azure:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cloud-provider-gcp:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-api-provider-aws:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-api-provider-gcp:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-api-provider-azure:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-api:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-capi-operator:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-cloud-controller-manager-operator:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-control-plane-machine-set-operator:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/cluster-machine-approver:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/machine-api-operator:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/machine-api-provider-aws:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/machine-api-provider-gcp:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift/machine-api-provider-azure:
+    labels:
+      - color: c7def8
+        description: Allows PRs to merge without qe-approved label
+        name: no-qe
+        target: prs
+        addedBy: label
+  openshift-kni/lifecycle-agent:
+    labels:
+      - color: ed6d6d
+        description: Cluster config API changed. It's used by other projects. Review to ensure your change is nonbreaking
+        name: cluster-config-api-changed
+        target: prs
+        addedBy: label
+  openshift/monitoring-plugin:
+    labels:
+      - color: 37A3A3
+        description: Signifies that UX has signed off on this PR
+        name: ux-approved
+        target: prs
+        addedBy: label
+  openshift/troubleshooting-panel-console-plugin:
+    labels:
+      - color: 37A3A3
+        description: Signifies that UX has signed off on this PR
+        name: ux-approved
+        target: prs
+        addedBy: label
+  openshift/logging-view-plugin:
+    labels:
+      - color: 37A3A3
+        description: Signifies that UX has signed off on this PR
+        name: ux-approved
+        target: prs
+        addedBy: label
+  openshift/distributed-tracing-console-plugin:
+    labels:
+      - color: 37A3A3
+        description: Signifies that UX has signed off on this PR
+        name: ux-approved
+        target: prs
+        addedBy: label
+  opendatahub-io/opendatahub-operator:
+    labels:
+      - color: 486B5D
+        description: Signifies that the PR is ready for integration tests
+        name: run-integration-tests
+        target: prs
         addedBy: label

@@ -1,33 +1,21 @@
-base_images:
-  base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cli-manager
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: cli-manager
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cli-manager
 promotion:
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - name: 4.22-priv
+    namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.14-priv
+  name: 4.22-priv
   namespace: ocp-private
 tests:
 - as: verify
@@ -38,6 +26,34 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: fips-image-scan-cli-manager
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: cli-manager
+    test:
+    - ref: fips-check-image-scan
+- as: e2e-aws-operator
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - ref: fips-check-fips-or-die
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift-priv

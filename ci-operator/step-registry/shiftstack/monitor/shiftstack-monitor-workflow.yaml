@@ -1,9 +1,0 @@
-workflow:
-  as: shiftstack-monitor
-  steps:
-    pre:
-    - ref: openstack-conf-clouds
-    test:
-    - ref: shiftstack-monitor
-  documentation: |-
-    Monitor resources on the CI clouds and publish metrics.

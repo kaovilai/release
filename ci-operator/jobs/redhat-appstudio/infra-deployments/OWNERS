@@ -6,34 +6,16 @@
 
 approvers:
 - adambkaplan
-- alexeykazakov
-- bamachrn
-- chmouel
-- dirgim
-- elsony
+- arewm
+- eisraeli
+- filariow
 - gbenhaim
-- jduimovich
-- jgwest
-- johnmcollier
-- ksprinkl
-- michkov
-- rhopp
-- sbose78
-- scoheb
+- sadlerap
 options: {}
 reviewers:
 - adambkaplan
-- alexeykazakov
-- bamachrn
-- chmouel
-- dirgim
-- elsony
+- arewm
+- eisraeli
+- filariow
 - gbenhaim
-- jduimovich
-- jgwest
-- johnmcollier
-- ksprinkl
-- michkov
-- rhopp
-- sbose78
-- scoheb
+- sadlerap

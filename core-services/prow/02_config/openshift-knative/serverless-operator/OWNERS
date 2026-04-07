@@ -5,29 +5,18 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- alanfx
 - aliok
-- jcrossley3
+- creydr
+- dsimansk
+- kaustubh-pande
 - lberk
+- maschmid
 - matzew
-- mgencur
-- nak3
 - openshift-cherrypick-robot
-- pierdipi
-- retocode
-- rhuss
-- skonto
 options: {}
 reviewers:
-- alanfx
 - aliok
+- creydr
 - dsimansk
-- jcrossley3
-- lberk
+- kaustubh-pande
 - matzew
-- mgencur
-- nak3
-- pierdipi
-- retocode
-- rhuss
-- skonto

@@ -11,6 +11,27 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
+
+# In order for openshift-tests to pull external binary images from the
+# payload, we need access enabled to the images on the build farm. In
+# order to do that, we need to unset the KUBECONFIG so we talk to the
+# build farm, not the cluster under test.
+echo "Granting access for image pulling from the build farm..."
+KUBECONFIG_BAK=$KUBECONFIG
+unset KUBECONFIG
+oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+export KUBECONFIG=$KUBECONFIG_BAK
+
+# Starting in 4.21, we will aggressively retry test failures only in
+# presubmits to determine if a failure is a flake or legitimate. This is
+# to reduce the number of retests on PR's.
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
+    if openshift-tests run --help | grep -q 'retry-strategy'; then
+        TEST_ARGS+=" --retry-strategy=aggressive"
+    fi
+fi
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -34,15 +55,26 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# OpenShift clusters intalled with platform type External is handled as 'None'
+# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
+# integrated by OpenShift (like AWS).
+STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
+if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
+    export CLUSTER_TYPE="external"
+fi
+
 if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
     export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+fi
+if [[ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]] && [[ -e "${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}" ]]; then
+    export TEST_OCP_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
 fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function cleanup() {
-    echo "Requesting risk analysis for test failures in this job run from sippy:"
-    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    #echo "Requesting risk analysis for test failures in this job run from sippy:"
+    #openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 
     echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
 }
@@ -50,26 +82,18 @@ trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
-# Override the upstream docker.io registry due to issues with rate limiting
-# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
-# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
-export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
-cat <<EOF > ${KUBE_TEST_REPO_LIST}
-dockerLibraryRegistry: quay.io/sjenning
-dockerGluster: quay.io/sjenning
-EOF
-
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
     oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
 fi
 
-# if this test requires an SSH bastion and one is not installed, configure it
-KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
+    # if this test requires an SSH bastion and one is not installed, configure it
+    KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+    KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+    export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
+
     export SSH_BASTION_NAMESPACE=test-ssh-bastion
     echo "Setting up ssh bastion"
 
@@ -106,10 +130,16 @@ if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
     export KUBE_SSH_BASTION="${BASTION_HOST}:22"
 fi
 
+if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
+    TEST_ARGS="${TEST_ARGS:-}"
+    TEST_ARGS+=" --from-repository=$(<"${SHARED_DIR}/mirror-tests-image")"
+fi
+
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
 
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
-gcp)
+gcp|gcp-arm64)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     # In k8s 1.24 this is required to run GCP PD tests. See: https://github.com/kubernetes/kubernetes/pull/109541
     export ENABLE_STORAGE_GCE_PD_DRIVER="yes"
@@ -121,7 +151,7 @@ gcp)
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
-aws|aws-arm64)
+aws|aws-arm64|aws-eusc)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
@@ -135,6 +165,7 @@ azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     ;;
 vsphere)
     # shellcheck disable=SC1090
@@ -164,22 +195,31 @@ openstack*)
     fi
     ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-ibmcloud)
+ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
     ;;
+powervs*)
+    #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
+    export TEST_PROVIDER='{"type":"ibmcloud"}'
+    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' ${SHARED_DIR}/powervs-config.json)
+    IBMCLOUD_API_KEY=${IC_API_KEY}
+    export IC_API_KEY
+    export IBMCLOUD_API_KEY
+    ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
+external) export TEST_PROVIDER='{"type":"external"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == gcp ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
@@ -211,12 +251,25 @@ function upgrade_conformance() {
     local exit_code=0 &&
     upgrade || exit_code=$? &&
     PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
-    if test False = "${PROGRESSING}"
+    HISTORY_LENGTH="$(oc get -o jsonpath='{range .status.history[*]}{.version}{"\n"}{end}' clusterversion version | wc -l)" &&
+    if test 2 -gt "${HISTORY_LENGTH}"
     then
-        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    else
+        echo "Skipping conformance suite because ClusterVersion only has ${HISTORY_LENGTH} entries, so an update was not run"
+    elif test False != "${PROGRESSING}"
+    then
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    else
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
     fi &&
+    return $exit_code
+}
+
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
     return $exit_code
 }
 
@@ -287,6 +340,38 @@ function suite() {
     set +x
 }
 
+function wait_for_ipsec_full_mode() {
+  until
+    timeout 30s oc rollout status daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes && \
+    oc wait --for=delete daemonset/ovn-ipsec-containerized -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not available yet (or) ovn-ipsec-containerized daemonset is still deployed"
+    sleep 30s
+  done
+  wait_for_cluster_operators_ready
+}
+
+function wait_for_ipsec_external_mode() {
+  until
+    oc wait --for=delete daemonset/ovn-ipsec-host -n openshift-ovn-kubernetes --timeout=30s;
+  do
+    echo "ovn-ipsec-host daemonset is not removed yet"
+    sleep 30s
+  done
+  wait_for_cluster_operators_ready
+}
+
+function wait_for_cluster_operators_ready() {
+  until
+    oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+    oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+  do
+    echo "Cluster Operators Degraded=True,Progressing=True,or Available=False"
+    sleep 30s
+  done
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
@@ -296,6 +381,10 @@ oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
+node_check_interval=30
+node_check_limit=20
+# AWS Local Zone nodes usually take much more to be ready.
+test -n "${AWS_EDGE_POOL_ENABLED-}" && node_check_limit=60
 while true
 do
     MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
@@ -310,10 +399,10 @@ EOF
         echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
         break
     fi
-    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-    sleep 30
+    echo "$(date) [$i/$node_check_limit] - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep $node_check_interval
     i=$((i+1))
-    if [ $i -gt 20 ]; then
+    if [ $i -gt $node_check_limit ]; then
       MACHINELIST="$(kubectl get machines -A)"
       NODELIST="$(kubectl get nodes)"
       cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
@@ -394,6 +483,16 @@ echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
+# reportedly even the above is not enough for etcd which can still require time to stabilize and rotate certs.
+# wait longer if the new command is available, but it won't be present in past releases.
+echo "$(date) - waiting for oc adm wait-for-stable-cluster..."
+if oc adm wait-for-stable-cluster --minimum-stable-period 2m &>/dev/null; then
+	echo "$(date) - oc adm reports cluster is stable."
+else
+	echo "$(date) - oc adm wait-for-stable-cluster is not available in this release"
+fi
+
+
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 count=1
 while :
@@ -431,7 +530,7 @@ do
   for imagestream in $non_imported_imagestreams
   do
       echo "[$(date)] Retrying image import $imagestream"
-      oc import-image -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
+      oc import-image --insecure=true -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
   done
   set -e
 done
@@ -448,12 +547,36 @@ upgrade)
 upgrade-paused)
     upgrade_paused
     ;;
+upgrade-rt)
+    upgrade_rt
+    ;;
 suite-conformance)
     suite
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
     suite
+    ;;
+ipsec-suite)
+     # Rollout IPsec Full mode and run the suite.
+     echo "Rolling out IPsec Full mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec External mode and run the suite.
+     echo "Rolling out IPsec External mode"
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
+     wait_for_ipsec_external_mode
+     echo "IPsec External mode rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+
+     # Rollout IPsec Full mode with NAT-T encapsulation and run the suite.
+     oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full", "full":{"encapsulation": "Always"}}}}}}'
+     wait_for_ipsec_full_mode
+     echo "IPsec Full mode with NAT-T encapsulation rollout complete. running IPsec test suite now"
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"

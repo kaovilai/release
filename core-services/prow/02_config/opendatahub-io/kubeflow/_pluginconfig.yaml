@@ -36,6 +36,7 @@ plugins:
     - lifecycle
     - override
     - retitle
+    - size
     - skip
     - trigger
     - transfer-issue
@@ -46,3 +47,4 @@ triggers:
   - opendatahub-io/kubeflow
   trusted_apps:
   - pull
+  - openshift-merge-bot

@@ -2,19 +2,28 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-9-release-golang-1.23-openshift-4.19
 images:
-- dockerfile_path: Dockerfiles/ocp4_content
-  to: ocp4-content-ds
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfiles/ocp4_content
+    to: ocp4-content-ds
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   initial:
     integration:
-      name: "4.13"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -22,10 +31,134 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
+- always_run: true
+  as: e2e-aws-openshift-platform-compliance
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export CONTENT_DIRECTORY=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test . -run=^TestPlatformCompliance$ -test-type="platform" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: true
+  as: e2e-aws-openshift-node-compliance
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export CONTENT_DIRECTORY=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestNodeCompliance$ -test-type="node" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-bsi
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=bsi
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-bsi-node
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=bsi-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-bsi
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export PROFILE=bsi
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - always_run: false
   as: e2e-aws-rhcos4-e8
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
@@ -33,11 +166,11 @@ tests:
         set -x
         export PROFILE=e8
         export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -49,18 +182,20 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-e8
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
       commands: |
         export PROFILE=e8
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -72,8 +207,9 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-moderate
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - as: test
@@ -81,11 +217,42 @@ tests:
       commands: |
         export PROFILE=moderate
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-moderate-arm
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -97,8 +264,9 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-moderate-node
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - as: test
@@ -106,11 +274,42 @@ tests:
       commands: |
         export PROFILE=moderate-node
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-moderate-node-arm
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -122,18 +321,50 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-cis
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
       commands: |
         export PROFILE=cis
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-cis-arm
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=cis
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -145,18 +376,50 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-cis-node
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
       commands: |
         export PROFILE=cis-node
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-cis-node-arm
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=cis-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -168,8 +431,9 @@ tests:
 - always_run: false
   as: e2e-aws-rhcos4-moderate
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     pre:
     - chain: ipi-aws-pre
@@ -180,11 +444,45 @@ tests:
       commands: |
         export PROFILE=moderate
         export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-moderate-arm
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      CONTROL_ARCH: arm64
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -196,8 +494,9 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-stig
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - as: test
@@ -205,11 +504,11 @@ tests:
       commands: |
         export PROFILE=stig
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -221,8 +520,9 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-stig-node
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - as: test
@@ -230,11 +530,11 @@ tests:
       commands: |
         export PROFILE=stig-node
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -246,18 +546,20 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-pci-dss
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
       commands: |
         export PROFILE=pci-dss
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -269,18 +571,70 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-pci-dss-node
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
       commands: |
         export PROFILE=pci-dss-node
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-pci-dss-4-0
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss-4-0
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-pci-dss-node-4-0
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss-node-4-0
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -292,8 +646,9 @@ tests:
 - always_run: false
   as: e2e-aws-rhcos4-high
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     pre:
     - chain: ipi-aws-pre
@@ -304,11 +659,40 @@ tests:
       commands: |
         export PROFILE=high
         export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-stig
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=stig
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -320,8 +704,9 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-high
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - as: test
@@ -329,11 +714,11 @@ tests:
       commands: |
         export PROFILE=high
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds
@@ -345,8 +730,9 @@ tests:
 - always_run: false
   as: e2e-aws-ocp4-high-node
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
     env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
     - as: test
@@ -354,356 +740,11 @@ tests:
       commands: |
         export PROFILE=high-node
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-e8-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        set -x
-        export PROFILE=e8
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-e8-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=e8
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-moderate-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-moderate-node-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-cis-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-cis-node-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=cis-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-moderate-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=moderate
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-stig-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=stig
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-stig-node-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=stig-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-pci-dss-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-pci-dss-node-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=pci-dss-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-rhcos4-high-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=high
-        export PRODUCT=rhcos4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-high-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=high
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-ocp4-high-node-weekly
-  cron: 07 20 * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export PROFILE=high-node
-        export PRODUCT=ocp4
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e
-        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
       dependencies:
       - env: CONTENT_IMAGE
         name: ocp4-content-ds

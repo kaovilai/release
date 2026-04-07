@@ -5,21 +5,25 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- adamviktora
 - avivtur
-- hstastna
+- galkremer1
+- gouyang
+- lkladnit
 - metalice
 - pcbailey
-- tnisan
+- rszwajko
 - upalatucci
 - vojtechszocs
-- yaacov
 options: {}
 reviewers:
+- adamviktora
 - avivtur
-- hstastna
+- batyana
+- gouyang
+- lkladnit
 - metalice
 - pcbailey
-- tnisan
+- rszwajko
 - upalatucci
 - vojtechszocs
-- yaacov

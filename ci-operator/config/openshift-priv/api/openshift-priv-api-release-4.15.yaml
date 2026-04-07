@@ -1,10 +1,20 @@
+base_images:
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/api
+images:
+  items:
+  - dockerfile_path: Dockerfile.rhel8
+    to: cluster-config-api
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -29,7 +39,12 @@ tests:
     from: bin
 - as: verify
   commands: |
-    make verify -k --warn-undefined-variables
+    make verify-scripts verify-codegen-crds -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-crd-schema
+  commands: |
+    make verify-crd-schema -k --warn-undefined-variables
   container:
     from: bin
 - as: verify-deps
@@ -50,7 +65,7 @@ tests:
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
-    git clone https://github.com/openshift/client-go $dir
+    git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
     rm -rf $dir/vendor/github.com/openshift/api/*
     cp -Rf * $dir/vendor/github.com/openshift/api/
     rm -rf $dir/vendor/github.com/openshift/api/vendor
@@ -59,6 +74,61 @@ tests:
     go build ./...
   container:
     from: bin
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-serial
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-serial-techpreview
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-gcp
+  optional: true
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- always_run: false
+  as: e2e-azure
+  optional: true
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: openshift-org-azure
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-upgrade
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-aws-ovn-hypershift
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

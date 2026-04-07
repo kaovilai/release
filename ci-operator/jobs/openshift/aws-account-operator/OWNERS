@@ -5,18 +5,23 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
-- dkeohane
+- abyrne55
+- alexsmithgh
+- dakotalongrh
+- eth1030
 - iamkirkbater
 - jharrington22
-- nautilux
+- joshbranham
+- luis-falcon
+- reedcort
 options: {}
 reviewers:
-- alexvulaj
-- bergmannf
-- dkeohane
+- abyrne55
+- alexsmithgh
+- dakotalongrh
+- eth1030
 - iamkirkbater
 - jharrington22
-- mrwinston
-- nautilux
+- joshbranham
+- luis-falcon
 - reedcort
-- t0masd

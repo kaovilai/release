@@ -10,6 +10,7 @@ function populate_artifact_dir() {
     echo "Copying log bundle..."
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   fi
+
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
@@ -21,6 +22,7 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
+
   case "${CLUSTER_TYPE}" in
     powervs*)
       # We don't want debugging in this section
@@ -30,13 +32,19 @@ function populate_artifact_dir() {
       unset IBMCLOUD_TRACE
 
       echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-      ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select (.name|test("'${CLUSTER_NAME}'")) | [.name, .id, .networkPorts[].ip, .networkPorts[].macAddress]'
       echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
       ;;
     *)
       >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
       ;;
   esac
+
+  if [ -d "${dir}/.clusterapi_output" ]
+  then
+    echo "Copying CAPI output to artifact dir"
+    cp -r "${dir}/.clusterapi_output/" "${ARTIFACT_DIR}/clusterapi_output/"
+  fi
 }
 
 function prepare_next_steps() {
@@ -73,7 +81,7 @@ function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
   export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
   export PROMTAIL_VERSION="v2.4.1"
-
+DNS record
   config_dir=/tmp/promtail
   mkdir "${config_dir}"
   cp /var/run/loki-grafanacloud-secret/client-secret "${config_dir}/grafanacom-secrets-password"
@@ -220,95 +228,55 @@ function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
 
-  export HOME=/tmp
+  export HOME=/output
 
-  if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.15.0/IBM_Cloud_CLI_2.15.0_amd64.tar.gz
-    tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
-
-    if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
-      exit 1
-    fi
-
-    PATH=${PATH}:/tmp/Bluemix_CLI/bin
-
-    hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
-    echo "Checking ibmcloud version..."
-    if ! ibmcloud --version; then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
-      exit 1
-    fi
-
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
-      ibmcloud plugin install ${I}
-    done
-    ibmcloud plugin list
-
-    for PLUGIN in cis pi; do
-      if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
-        echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
-        ls -la ${HOME}/.bluemix/
-        ls -la ${HOME}/.bluemix/plugins/
-        exit 1
-      fi
-    done
+  hash ibmcloud || exit 1
+  echo "Checking ibmcloud version..."
+  if ! ibmcloud --version; then
+    echo "Error: ibmcloud is not working?"
+    exit 1
   fi
 
-  if [ ! -f /tmp/jq ]; then
+  #
+  # NOTE: This should be covered by images/installer/Dockerfile.upi.ci in the installer repo
+  #
+  for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
+    #
+    # NOTE: If a plugin is already installed then don't do another install. If not, then install it.
+    # 
+    yes N | ibmcloud plugin install ${I}
+  done
+  ibmcloud plugin list
 
-    for I in $(seq 1 10)
-    do
-      curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
-
-      hash file 2>/dev/null && file /tmp/jq
-      echo "Checking jq version..."
-      if /tmp/jq --version; then
-        break
-      else
-        echo "Error: /tmp/jq is not working?"
-        /bin/rm /tmp/jq
-        sleep 30s
-      fi
-    done
-
-    if [ ! -f /tmp/jq ]; then
-      echo "Error: Could not successfully download jq!"
+  for PLUGIN in cis pi; do
+    if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
+      echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
+      ls -la ${HOME}/.bluemix/
+      ls -la ${HOME}/.bluemix/plugins/
       exit 1
     fi
+  done
 
-    #PATH=${PATH}:/tmp/:/tmp/jq
-    PATH=${PATH}:/tmp
-  fi
-
-  if [ ! -f /tmp/yq ] || [ ! -f /bin/yq-go ]; then
-
-    uname -m
-    ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
-    echo "ARCH=${ARCH}"
-    if [ -z "${ARCH}" ]; then
-      echo "Error: ARCH is empty!"
-      exit 1
-    fi
-
-    for I in $(seq 1 10)
-    do
-      curl -L "https://github.com/mikefarah/yq/releases/download/v4.25.3/yq_linux_${ARCH}" -o /tmp/yq && chmod +x /tmp/yq
-
-      hash file 2>/dev/null && file /tmp/yq
-      echo "Checking yq version..."
-      if /tmp/yq --version; then
-        break
-      else
-        echo "Error: /tmp/yq is not working?"
-        /bin/rm /tmp/yq
-        sleep 30s
-      fi
-    done
-  fi
-
-  PATH=${PATH}:$(pwd)/bin
+  mkdir -p /tmp/bin
+  PATH=${PATH}:/tmp/bin
   export PATH
+
+  echo "Installing yq-v4"
+  # Install yq manually if its not found in installer image
+  cmd_yq="$(which yq-v4 2>/dev/null || true)"
+  if [ ! -x "${cmd_yq}" ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+      -o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
+  fi
+
+  echo "Installing PowerVS-DHCP-report"
+  DHCP_TAR="PowerVS-DHCP-report-v1.3-linux-amd64.tar.gz"
+  curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR}
+  (cd /tmp/; tar xzvf ${DHCP_TAR}; mv PowerVS-DHCP-report /tmp/bin/)
+
+  hash jq || exit 1
+  hash yq-v4 || exit 1
+  hash PowerVS-DHCP-report || exit 1
 }
 
 function init_ibmcloud() {
@@ -333,15 +301,60 @@ function init_ibmcloud() {
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
 
-  CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  echo "BASE_DOMAIN = ${BASE_DOMAIN}"
+  (
+  set -xeuo pipefail;
+  INSTANCES=$(mktemp);
+  DOMAINS=$(mktemp);
+  trap '/bin/rm "${INSTANCES}" "${DOMAINS}"' EXIT;
+  ibmcloud cis instances --output json > ${INSTANCES};
+  while read INSTANCE;
+  do
+    ibmcloud cis instance "${INSTANCE}" --output json | jq -r '.crn' > /tmp/cis_instance;
+    ibmcloud cis instance-set ${INSTANCE};
+    ibmcloud cis domains --output json > ${DOMAINS};
+    while read DOMAIN;
+    do
+      echo "DOMAIN=${DOMAIN}";
+      if [ "${DOMAIN}" == "${BASE_DOMAIN}" ]
+      then
+        exit 0;
+      fi;
+    done < <(jq -r '.[] | .name' ${DOMAINS});
+  done < <(jq -r '.[] | .name' ${INSTANCES});
+  true > /tmp/cis_instance;
+  )
+  CIS_INSTANCE_CRN=$(cat /tmp/cis_instance)
+  if [ -z "${CIS_INSTANCE_CRN}" ]; then
+    echo "Error: CIS_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export CIS_INSTANCE_CRN
 
-  SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  if [ -z "${POWERVS_SERVICE_INSTANCE_ID}" ]; then
+    echo "Error: POWERVS_SERVICE_INSTANCE_ID is empty!"
+    exit 1
+  fi
+
+  # BUG, this:
+  #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
+  # does not always return a match!  This also is likely to fail:
+  #  ibmcloud pi workspace list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
+  #SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
+  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[] | select(.type|contains("resource-instance")) | .crn')"
+  if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
+    echo "Error: SERVICE_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export SERVICE_INSTANCE_CRN
 
-  ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
+  ibmcloud pi workspace target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
+  if [ -z "${CLOUD_INSTANCE_ID}" ]; then
+    echo "Error: CLOUD_INSTANCE_ID is empty!"
+    exit 1
+  fi
   export CLOUD_INSTANCE_ID
 }
 
@@ -373,7 +386,7 @@ function check_resources() {
   #
   # Quota check for image imports
   #
-  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
+  JOBS=$(ibmcloud pi job list --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
     echo "JOBS=${JOBS}"
@@ -389,51 +402,17 @@ function check_resources() {
 
 function destroy_resources() {
   #
-  # TODO: Remove after infra bugs are fixed
-  # TO confirm resources are cleared properly
-  #
-
-  #
-  # Clean up DHCP networks via curl.
-  # At the moment, this is the only api and 4.11 version of destroy cluster
-  # only cleans up DHCP networks in use by VMs, which is not always the case.
-  #
-  [ -z "${CLOUD_INSTANCE_ID}" ] && exit 1
-  echo "CLOUD_INSTANCE_ID=${CLOUD_INSTANCE_ID}"
-  set +x
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT="$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")"
-  echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
-  for i in {1..3}; do
-    while read UUID
-    do
-      echo ${UUID}
-      GET_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-      echo "GET_RESULT=${GET_RESULT}"
-      if [ "${GET_RESULT}" == "{}" ]
-      then
-        continue
-      fi
-      if [ "$(echo "${GET_RESULT}" | jq -r '.error')" == "dhcp server not found" ]
-      then
-        continue
-      fi
-      DELETE_RESULT=$(curl --silent --location --request DELETE "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-      echo "DELETE_RESULT=${DELETE_RESULT}"
-      sleep 2m
-    done < <(echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id')
-  done
-
-  #
   # Create a fake cluster metadata file
   #
   mkdir /tmp/ocp-test
+
   cat > "/tmp/ocp-test/metadata.json" << EOF
-{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
+{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
+
+  if [ -n "${PERSISTENT_TG:-}" ]; then
+    jq -r -c --arg PERSISTENT_TG "${PERSISTENT_TG}" '. | .powervs.tgName = $PERSISTENT_TG' "/tmp/ocp-test/metadata.json"
+  fi
 
   #
   # Call destroy cluster on fake metadata file
@@ -452,17 +431,6 @@ EOF
       break
     fi
   done
-
-  #
-  # Clean up leftover networks
-  #
-  (
-    while read UUID
-    do
-      echo ibmcloud pi network-delete ${UUID}
-      ibmcloud pi network-delete ${UUID}
-    done
-  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
 
   if ! ${DESTROY_SUCCEEDED}
   then
@@ -496,31 +464,30 @@ function dump_resources() {
   echo "INFRA_ID=${INFRA_ID}"
   export INFRA_ID
 
-  echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
+(
+  echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
-
-  if [ -z "${CLOUD_UUID}" ]
+  if [ -n "${PERSISTENT_TG:-}" ]
   then
-    echo "Error: Could not find a Cloud Connection with the name ${INFRA_ID}"
+    GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_TG}'")) | .id')
   else
-    ibmcloud pi connection ${CLOUD_UUID}
+    GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  fi
+  if [ -z "${GATEWAY_ID}" ]
+  then
+    echo "Error: GATEWAY_ID is empty"
+    exit
   fi
 
-  echo "8<--------8<--------8<--------8<-------- Direct Link 8<--------8<--------8<--------8<--------"
+  ibmcloud tg connections ${GATEWAY_ID}
+)
 
-  DL_UUID=$(ibmcloud dl gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
-
-  if [ -z "${DL_UUID}" ]
-  then
-    echo "Error: Could not find a Direct Link with the name ${INFRA_ID}"
-  else
-    ibmcloud dl gateway ${DL_UUID}
-  fi
-
-# "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
+  echo "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 
 (
+  echo "NOTE: There should be three LBs found"
+  ibmcloud is load-balancers --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id) - \(.provisioning_status)"'
+
   LB_INT_FILE=$(mktemp)
   LB_MCS_POOL_FILE=$(mktemp)
   trap '/bin/rm "${LB_INT_FILE}" "${LB_MCS_POOL_FILE}"' EXIT
@@ -530,6 +497,7 @@ function dump_resources() {
   if [ -z "${LB_INT_ID}" ]
   then
     echo "Error: LB_INT_ID is empty"
+    echo "Error: The internal load balancer was not found!"
     exit
   fi
 
@@ -539,8 +507,13 @@ function dump_resources() {
   LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("machine-config-server")) | .id' ${LB_INT_FILE})
   if [ -z "${LB_MCS_ID}" ]
   then
-    echo "Error: LB_MCS_ID is empty"
-    exit
+    LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("additional-pool-22623")) | .id' ${LB_INT_FILE})
+    if [ -z "${LB_MCS_ID}" ]
+    then
+      echo "Error: LB_MCS_ID is empty"
+      echo "Error: The machine config server pool under the internal LB was not found!"
+      exit
+    fi
   fi
 
   echo "8<--------8<--------8<--------8<-------- LB Machine Config Server 8<--------8<--------8<--------8<--------"
@@ -554,45 +527,63 @@ function dump_resources() {
   done < <(jq -r '.members[].id' ${LB_MCS_POOL_FILE})
 )
 
+(
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
 
-  VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
-
+  if [ -n "${PERSISTENT_VPC:-}" ]
+  then
+    VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${PERSISTENT_VPC}'")) | .id')
+  else
+    VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  fi
   if [ -z "${VPC_UUID}" ]
   then
-    echo "Error: Could not find a VPC with the name ${INFRA_ID}"
-  else
-    ibmcloud is vpc ${VPC_UUID}
+    echo "Error: VPC_ID is empty"
+    exit
   fi
+
+  ibmcloud is vpc ${VPC_UUID}
+)
 
   echo "8<--------8<--------8<--------8<-------- DHCP networks 8<--------8<--------8<--------8<--------"
+  (
+    if [ -n "$(jq -r '.powervs.serviceInstanceGUID' "${dir}/metadata.json")" ]
+    then
+      echo "Running PowerVS-DHCP-report (serviceInstanceGUID) (check artifact directory for output)"
+      PowerVS-DHCP-report -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -shouldDebug false -serviceInstanceGUID "$(jq -r '.powervs.serviceInstanceGUID' "${dir}/metadata.json")" > "${ARTIFACT_DIR}/PowerVS-DHCP-report.txt"
+    else
+      echo "Running PowerVS-DHCP-report (infraID) (check artifact directory for output)"
+      PowerVS-DHCP-report -apiKey "$(cat /var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY)" -shouldDebug false -infraID "${INFRA_ID}" > "${ARTIFACT_DIR}/PowerVS-DHCP-report.txt"
+    fi
+  )
 
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-  echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
-  if [ $? -gt 0 ]
-  then
-    echo "DHCP_NETWORKS_RESULT=${DHCP_NETWORKS_RESULT}"
+(
+  echo "8<--------8<--------8<--------8<-------- DNS records 8<--------8<--------8<--------8<--------"
+
+  if [ -z "${CIS_INSTANCE_CRN}" ]; then
+    echo "Error: CIS_INSTANCE_CRN is empty!"
+    exit 1
   fi
 
-  echo "8<--------8<--------8<--------8<-------- DHCP network information 8<--------8<--------8<--------8<--------"
-
-  while read DHCP_UUID
+  FILE=$(mktemp)
+  trap '/bin/rm -rf ${FILE}' EXIT
+  ibmcloud cis instance-set ${CIS_INSTANCE_CRN};
+  DNS_DOMAIN_ID=$(ibmcloud cis domains --output json | jq -r '.[].id')
+  echo "DNS_DOMAIN_ID=${DNS_DOMAIN_ID}"
+  PAGE=1
+  while true
   do
-    DHCP_UUID_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${DHCP_UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-    echo "${DHCP_UUID_RESULT}" | jq -r '.'
-    if [ $? -gt 0 ]
+    ibmcloud cis dns-records ${DNS_DOMAIN_ID} --page ${PAGE} --output json > ${FILE}
+    if (( $(jq -r 'length' < ${FILE}) == 0 ))
     then
-      echo "DHCP_UUID_RESULT=${DHCP_UUID_RESULT}"
+      break
     fi
-
-  done < <( echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id' )
+    jq -r '.[] | select (.name|test("'${CLUSTER_NAME}'")) | "\(.id) \(.name)"' < ${FILE}
+    PAGE=$((PAGE+1))
+   done
+)
 
   echo "8<--------8<--------8<--------8<-------- oc get clusterversion 8<--------8<--------8<--------8<--------"
-
   (
     DEBUG=true
 
@@ -659,11 +650,38 @@ function dump_resources() {
     oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
   )
 
+  echo "8<--------8<--------8<--------8<-------- oc get pods -n openshift-machine-api 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -n openshift-machine-api
+    echo "8<--------8<-------- oc get machines.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machines.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc get machineset.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machineset.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc logs -l k8s-app=controller -c machine-controller -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s logs -l k8s-app=controller -c machine-controller -n openshift-machine-api
+  )
+
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
-  ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
+  ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select(.name|test("'${CLUSTER_NAME}'")) | " \(.name) - \(.status) - health reason: \(.health.reason) - health status: \(.health.status)"'
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
-  ibmcloud pi jobs --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+  ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+ 
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+  (
+    if [ -d "${dir}/.clusterapi_output" ]; then
+      yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+
+      echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+      for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
+      do
+	echo ${FILE}
+        yq-v4 eval .status.conditions ${FILE}
+	echo
+      done
+    fi
+  )
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
@@ -706,11 +724,31 @@ IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
-POWERVS_REGION=$(yq eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
-POWERVS_ZONE=$(yq eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
-VPCREGION=$(yq eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
-CLUSTER_NAME=$(yq eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_SERVICE_INSTANCE_ID=$(yq-v4 eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
+VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
+CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep TGNAME)" ]; then
+  PERSISTENT_TG=$(yq-v4 eval '.TGNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+if [ -n "$(yq-v4 'keys' "${SHARED_DIR}/powervs-conf.yaml" | grep VPCNAME)" ]; then
+  PERSISTENT_VPC=$(yq-v4 eval '.VPCNAME' "${SHARED_DIR}/powervs-conf.yaml")
+fi
+ARCH=$(yq-v4 eval '.ARCH' "${SHARED_DIR}/powervs-conf.yaml")
+BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervs-conf.yaml")
+LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervs-conf.yaml")
+
+echo "ARCH=${ARCH}"
+echo "BRANCH=${BRANCH}"
+echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+echo "VPCREGION=${VPCREGION}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
+echo "PERSISTENT_TG=${PERSISTENT_TG:-}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC:-}"
+
+# NOTE: If you want to test against a certain release, then do something like:
+# if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 == 19)) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -720,6 +758,9 @@ export POWERVS_RESOURCE_GROUP
 export POWERVS_USER_ID
 export VPCREGION
 export CLUSTER_NAME
+
+echo "tgName in ${SHARED_DIR}/install-config.yaml"
+grep tgName "${SHARED_DIR}/install-config.yaml" || true
 
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -849,6 +890,20 @@ stringData:
 type: Opaque
 EOF
 
+# Sets up the chrony machineconfig for the worker nodes
+CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+if [ -f "${CHRONY_WORKER_YAML}" ]; then
+  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
+  cp ${CHRONY_WORKER_YAML} "${dir}/manifests"
+fi
+
+# Sets up the chrony machineconfig for the master nodes
+CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+if [ -f "${CHRONY_MASTER_YAML}" ]; then
+  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
+  cp ${CHRONY_MASTER_YAML} "${dir}/manifests"
+fi
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
@@ -883,9 +938,30 @@ echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
+if [ ${ret} -gt 0 ]; then
+  SKIP_WAIT_FOR=false
+else
+  SKIP_WAIT_FOR=true
+fi
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
 
+# If we need to try again, then does the CAPI cluster status yaml file exist?
 if [ ${ret} -gt 0 ]; then
+  echo "Checking CAPI cluster status:"
+  ls -l /tmp/installer/.clusterapi_output/IBMPowerVS*yaml || true
+  for SFILE in /tmp/installer/.clusterapi_output/IBMPowerVS*yaml
+  do
+    echo "${SFILE}"
+    yq-v4 eval .status.ready ${SFILE}
+    RESULT=$(yq-v4 eval .status.ready ${SFILE})
+    if [ "${RESULT}" == "false" ]; then
+      SKIP_WAIT_FOR=true
+    fi
+  done
+fi
+
+echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
+if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'

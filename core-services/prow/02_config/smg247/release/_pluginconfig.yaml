@@ -39,6 +39,10 @@ external_plugins:
     - pull_request
     - push
     name: pj-rehearse-plugin-alpha
+  - endpoint: http://multi-pr-prow-plugin
+    events:
+    - issue_comment
+    name: multi-pr-prow-plugin
 lgtm:
 - repos:
   - smg247/release
@@ -48,7 +52,6 @@ plugins:
     plugins:
     - assign
     - blunderbuss
-    - bugzilla
     - cat
     - dog
     - heart
@@ -72,3 +75,8 @@ plugins:
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - smg247/release
+  trusted_apps:
+  - openshift-merge-bot

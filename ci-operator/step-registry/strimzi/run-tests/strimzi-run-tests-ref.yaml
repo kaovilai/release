@@ -21,12 +21,16 @@ ref:
       default: "amq-streams"
       documentation: |-
         Specify operator name as it is released to index image bundle. Keep the default value!
+    - name: OLM_OPERATOR_VERSION
+      default: ""
+      documentation: |-
+        Specify operator version as it is released to index image bundle.
     - name: OLM_SOURCE_NAME
       default: "redhat-operators"
       documentation: |-
         Specify operators source from where the operator will be installed.
     - name: OLM_APP_BUNDLE_PREFIX
-      default: "amqstreams"
+      default: "amq-streams"
       documentation: |-
         Specify operator app bundle prefix. Keep the default value!
     - name: OLM_OPERATOR_DEPLOYMENT_NAME

@@ -10,5 +10,14 @@ ref:
   - namespace: test-credentials
     name: azurestack-cluster-secrets
     mount_path: /var/run/azurestack-cluster-secrets
+  env:
+  - name: RHCOS_VHD_RESOURCE_GROUP
+    default: "rhcosvhd"
+    documentation: |-
+      The resource group of boot image vhd, the default value is for WWT environment.
+  - name: RHCOS_VHD_STORAGE_ACCOUNT
+    default: "vhdsa"
+    documentation: |-
+      The storage aaccount of boot image vhd, the default value is for WWT environment.
   documentation: |-
     The IPI ASH configure RHCOS step checks whether the RHCOS image specified in COREOS stream is available in the environment, uploads it if not available, and specifies the image in the install config.

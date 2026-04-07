@@ -8,13 +8,15 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- from: base
-  to: hypershift-toolkit
+  items:
+  - from: base
+    to: hypershift-toolkit
 promotion:
-  name: hypershift-4.2
-  namespace: hypershift-toolkit
+  to:
+  - name: hypershift-4.2
+    namespace: hypershift-toolkit
 releases:
   initial:
     integration:

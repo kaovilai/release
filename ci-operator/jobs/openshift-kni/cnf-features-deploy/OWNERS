@@ -10,23 +10,20 @@ filters:
     - fedepaol
     - ffromani
     - imiller0
+    - lack
     - schseba
     - yuvalk
+    - zeeke
     reviewers:
     - aneeshkp
     - bartwensley
     - fedepaol
     - ffromani
-    - ijolliffe
     - imiller0
-    - jlojosnegros
     - josephdrichard
-    - kenyis
-    - lack
     - marioferh
     - marsik
     - missxiaoguo
-    - nishant-parekh
     - sakhoury
     - schseba
     - serngawy
@@ -37,4 +34,23 @@ filters:
     - vladikr
     - yanirq
     - yuvalk
+    - zeeke
+  renovate.json:
+    approvers:
+    - fontivan
+    - shajmakh
+    - yanirq
+    reviewers:
+    - fontivan
+    - shajmakh
+    - yanirq
+  telco5g-konflux:
+    approvers:
+    - fontivan
+    - shajmakh
+    - yanirq
+    reviewers:
+    - fontivan
+    - shajmakh
+    - yanirq
 options: {}

@@ -1,0 +1,11 @@
+{
+	"path": "openshift/microshift/infra/aws/post/openshift-microshift-infra-aws-post-chain.yaml",
+	"owners": {
+		"approvers": [
+			"microshift-approvers"
+		],
+		"reviewers": [
+			"microshift-reviewers"
+		]
+	}
+}

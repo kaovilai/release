@@ -69,26 +69,24 @@ fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-IPV6_NAMESPACE=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ipv6-slaac
-  labels:
-    security.openshift.io/scc.podSecurityLabelSync: "false"
-    pod-security.kubernetes.io/enforce: "privileged"
-EOF
-)
+IPV6_NAMESPACE="ipv6-slaac"
+oc new-project "${IPV6_NAMESPACE}"
 echo "Created ${IPV6_NAMESPACE} Namespace"
 
+WORKERS=$(oc get nodes --selector=node-role.kubernetes.io/worker -o custom-columns=NAME:.metadata.name --no-headers)
+# We just need access to one node to identify the interface name to use
+FIRST_WORKER_NODE=$(echo ${WORKERS}| cut -f 1 -d " ")
+FIRST_WORKER_ADDITIONAL_PORT="${FIRST_WORKER_NODE}-1"
+FIXED_IPS=$(openstack port show ${FIRST_WORKER_ADDITIONAL_PORT} -c fixed_ips -f json)
+IP_ADDRESS=$(echo -e ${FIXED_IPS} | jq  -rM .fixed_ips[0].ip_address)
+INTERFACE_NAME=$(oc debug node/${FIRST_WORKER_NODE} -- ip a |grep ${IP_ADDRESS} | awk '{print $9}')
 
 cat <<EOF > "${SHARED_DIR}/additionalnetwork-ipv6.yaml"
 spec:
   additionalNetworks:
   - name: ${ADDITIONAL_NETWORK}
     namespace: ${IPV6_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${ADDITIONAL_NETWORK}", "type": "macvlan", "master": "ens4"}'
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${ADDITIONAL_NETWORK}", "type": "macvlan", "master": "${INTERFACE_NAME}"}'
     type: Raw
 EOF
 
@@ -96,7 +94,6 @@ oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwor
 wait_for_network
 
 WORKER_IPV6_PORTS=$(openstack port list --network "${ADDITIONAL_NETWORK}" --tags cluster-api-provider-openstack -c Name -f value)
-WORKERS=$(oc get nodes --selector=node-role.kubernetes.io/worker -o custom-columns=NAME:.metadata.name --no-headers)
 
 for i in $(seq 1 2); do
 
@@ -116,10 +113,13 @@ metadata:
     k8s.v1.cni.cncf.io/networks: ${ADDITIONAL_NETWORK}
 spec:
   nodeName: ${WORKER_NAME}
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - image: quay.io/kuryr/demo
     securityContext:
-      runAsUser: 1000
       allowPrivilegeEscalation: false
       capabilities:
         drop:

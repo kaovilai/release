@@ -1,20 +1,39 @@
+base_images:
+  go_builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 images:
-- dockerfile_path: Dockerfile
-  to: log-file-metric-exporter
+  items:
+  - build_args:
+    - name: BUILD_VERSION
+      value: v1.2.0
+    from: ubi9-minimal
+    inputs:
+      go_builder:
+        as:
+        - golang:1.23
+    to: log-file-metric-exporter
 promotion:
-  name: 5.y
-  namespace: logging
+  to:
+  - name: 6.y
+    namespace: logging
+  - namespace: logging
+    tag: v1.2.0
 releases:
   latest:
     release:
-      architecture: amd64
-      channel: fast
-      version: "4.12"
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:

@@ -17,12 +17,13 @@ collect_artifacts() {
 }
 trap collect_artifacts EXIT TERM
 
-# Copy test binaries on packet server
-echo "### Copying test binaries"
-scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
 
 # Tests execution
 set +e
+
+export GREP_FLAGS=""
+export GREP_ARGS="'Feature:ProjectAPI'"
+export TIMEOUT_COMMAND=""
 
 if [[ -s "${SHARED_DIR}/test-list" ]]; then
     echo "### Copying test-list file"
@@ -30,32 +31,45 @@ if [[ -s "${SHARED_DIR}/test-list" ]]; then
         "${SSHOPTS[@]}" \
         "${SHARED_DIR}/test-list" \
         "root@${IP}:/tmp/test-list"
-    echo "### Running tests"
-    timeout \
-    --kill-after 10m \
-    120m \
-    ssh \
-        "${SSHOPTS[@]}" \
-        "root@${IP}" \
-        openshift-tests \
-        run \
-        "openshift/conformance/parallel" \
-        --dry-run \
-        \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
-else
-    echo "### Running tests"
-    ssh \
-        "${SSHOPTS[@]}" \
-        "root@${IP}" \
-        openshift-tests \
-        run \
-        "openshift/conformance/parallel" \
-        --dry-run \
-        \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+
+    GREP_FLAGS="-Ff"
+    GREP_ARGS="/tmp/test-list"
+    TIMEOUT_COMMAND="timeout --kill-after 10m 120m"
 fi
 
-rv=$?
+echo "### Running tests"
+${TIMEOUT_COMMAND} ssh "${SSHOPTS[@]}" "root@${IP}" bash -s "${OPENSHIFT_TESTS_IMAGE}" "${GREP_FLAGS}" "${GREP_ARGS}" << "EOF"
+
+    set -x
+
+    function get_test_list() {
+        podman run --network host --rm -i -e KUBECONFIG=/tmp/kubeconfig -v ${KUBECONFIG}:/tmp/kubeconfig $1 \
+            openshift-tests run "openshift/conformance/parallel" --dry-run | \
+            grep $2 $3
+    }
+
+    function run_tests() {
+        podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v ${kubeconfig}:/tmp/kubeconfig $1 \
+            openshift-tests run -o /tmp/artifacts/e2e_${name}.log --junit-dir /tmp/artifacts/reports -f -
+    }
+
+    for kubeconfig in $(find ${KUBECONFIG} -type f); do
+        export KUBECONFIG=${kubeconfig}
+        name=$(basename ${kubeconfig})
+
+        stderr=$( { get_test_list $1 $2 $3 | run_tests $1; } 2>&1)
+        exit_code=\$?
+
+        echo "\${stderr}"
+
+        if [[ \${exit_code} -ne 0 ]]; then
+            exit \${exit_code}
+        fi
+    done
+EOF
+
+exit_code=$?
 
 set -e
-echo "### Done! (${rv})"
-exit $rv
+echo "### Done! (${exit_code})"
+exit $exit_code

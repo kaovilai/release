@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "${BASE_DOMAIN:?BASE_DOMAIN env variable should be defined}" > "${SHARED_DIR}"/basedomain.txt
 
-cluster_name="${NAMESPACE}-${JOB_NAME_HASH}"
+cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
@@ -18,19 +18,25 @@ export HOME=/tmp
 if ! command -v aws &> /dev/null
 then
     echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
-    export PATH="${HOME}/.local/bin:${PATH}"
-    if command -v pip3 &> /dev/null
+    export PATH="${HOME}/.local/bin:${PATH}" 
+
+    if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
     then
+      easy_install --user 'pip<21'
+      pip install --user awscli
+    elif [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 3 ]
+    then
+      python -m ensurepip
+      if command -v pip3 &> /dev/null
+      then        
         pip3 install --user awscli
-    else
-        if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
-        then
-          easy_install --user 'pip<21'
-          pip install --user awscli
-        else
-          echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
-          exit 1
-        fi
+      elif command -v pip &> /dev/null
+      then
+        pip install --user awscli
+      fi
+    else    
+      echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
+      exit 1
     fi
 fi
 
@@ -42,6 +48,8 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+# api-int record is needed just for Windows nodes
+# TODO: Remove the api-int entry in future
 echo "$(date -u --rfc-3339=seconds) - Creating DNS records ..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
@@ -50,6 +58,14 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "Action": "UPSERT",
     "ResourceRecordSet": {
       "Name": "api.${cluster_domain}.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${API_VIP}"}]
+      }
+    },{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "api-int.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]
@@ -67,6 +83,8 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Creating batch file to destroy DNS records"
 
+# api-int record is needed for Windows nodes
+# TODO: Remove the api-int entry in future
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 {
 "Comment": "Delete public OpenShift DNS records for Nutanix IPI CI install",
@@ -74,6 +92,14 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.${cluster_domain}.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${API_VIP}"}]
+      }
+    },{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+      "Name": "api-int.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]

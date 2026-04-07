@@ -5,13 +5,39 @@
 # See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
 
 approvers:
+- bergmannf
+- bmeng
 - feichashao
-- reetika-vyas
+- gvnnn
+- makdaam
+- matesaary
+- mitalibhalla
+- nikokolas3270
+- petrkotas
+- raphaelbut
+- rolandmkunkel
+- samanthajayasinghe
+- typeid
 - wanghaoran1988
+- xiaoyu74
+- zmird-r
 options: {}
 reviewers:
+- bergmannf
+- bmeng
+- dakotalongrh
 - feichashao
+- gvnnn
+- makdaam
+- matesaary
 - mitalibhalla
-- reetika-vyas
-- supreeth7
+- nikokolas3270
+- petrkotas
+- raphaelbut
+- rolandmkunkel
+- samanthajayasinghe
+- tessg22
+- typeid
 - wanghaoran1988
+- xiaoyu74
+- zmird-r

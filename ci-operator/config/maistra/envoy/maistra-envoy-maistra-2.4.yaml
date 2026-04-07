@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.16"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,8 +12,8 @@ build_root:
 releases:
   latest:
     release:
-      channel: fast
-      version: "4.10"
+      channel: stable
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -22,7 +22,7 @@ resources:
 tests:
 - as: maistra-envoy-unit-2-4
   steps:
-    cluster_profile: aws
+    cluster_profile: ossm-aws
     env:
       CI: "true"
       COMPUTE_NODE_REPLICAS: "1"
@@ -31,7 +31,7 @@ tests:
       LOCAL_CPU_RESOURCES: "30"
       LOCAL_JOBS: "30"
       LOCAL_RAM_RESOURCES: "61440"
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
@@ -63,6 +63,7 @@ tests:
            export LOCAL_RAM_RESOURCES=${LOCAL_RAM_RESOURCES}; \
            export LOCAL_JOBS=${LOCAL_JOBS}; \
           ./maistra/run-ci.sh"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -77,7 +78,6 @@ tests:
           memory: 100Mi
       timeout: 8h0m0s
     workflow: servicemesh-envoy-e2e-aws
-  timeout: 8h0m0s
 - as: update-proxy-2-4
   commands: |
     ./maistra/run-test-infra-script.sh ./tools/automator.sh \
@@ -85,7 +85,7 @@ tests:
     -f /creds-github/token \
     -r proxy \
     '-c make maistra-update-everything' \
-    '-t Automator: Update Envoy and dependencies' \
+    '-t [maistra-2.4] Automator: Update Envoy and dependencies' \
     -m bump-envoy-2.4 \
     -b maistra-2.4
   container:
@@ -93,7 +93,7 @@ tests:
   postsubmit: true
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 zz_generated_metadata:
   branch: maistra-2.4
   org: maistra

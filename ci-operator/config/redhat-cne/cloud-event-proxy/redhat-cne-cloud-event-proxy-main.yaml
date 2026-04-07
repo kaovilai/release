@@ -1,38 +1,39 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.22"
     namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: base-rhel9
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: cloud-event-proxy
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cloud-event-proxy
+  - dockerfile_path: examples/consumer.Dockerfile
+    to: cloud-event-consumer
 promotion:
-  name: "4.14"
-  namespace: ocp
+  to:
+  - excluded_images:
+    - cloud-event-consumer
+    name: ptp-4.22
+    namespace: origin
+  - excluded_images:
+    - cloud-event-consumer
+    name: "4.22"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.22"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:
@@ -42,9 +43,14 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws
-  optional: true
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
   steps:
-    cluster_profile: aws
     test:
     - as: functests
       cli: latest
@@ -55,29 +61,33 @@ tests:
             ln -s oc kubectl
         fi
         popd
-        GO_INSTALL_DIR=$(mktemp -d)
-        cd $GO_INSTALL_DIR
-        curl -LO "https://go.dev/dl/go1.17.3.linux-amd64.tar.gz"
-        tar xf "go1.17.3.linux-amd64.tar.gz"
-        export PATH=$GO_INSTALL_DIR/go/bin:$PATH
-        export GOROOT=$GO_INSTALL_DIR/go
-        cd -
-        # silence deprecations
-        export ACK_GINKGO_DEPRECATIONS=1.16.5
-        # silence Ginkgo 2.0 notice
-        export ACK_GINKGO_RC=true
-        oc get nodes
         export CNE_IMG=${IMAGE_CLOUD_EVENT_PROXY}
+        export CONSUMER_IMG=${IMAGE_CLOUD_EVENT_CONSUMER}
         hack/deploy_test.sh deploy
         make functests
       dependencies:
       - env: IMAGE_CLOUD_EVENT_PROXY
         name: pipeline:cloud-event-proxy
+      - env: IMAGE_CLOUD_EVENT_CONSUMER
+        name: pipeline:cloud-event-consumer
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-aws
+    workflow: generic-claim
+- always_run: false
+  as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cloud-event-proxy
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: main
   org: redhat-cne

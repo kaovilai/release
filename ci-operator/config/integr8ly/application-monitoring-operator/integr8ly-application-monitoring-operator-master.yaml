@@ -11,17 +11,19 @@ build_root:
     namespace: integr8ly
     tag: latest
 images:
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/integr8ly/application-monitoring-operator/build
-  to: application-monitoring-operator
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/integr8ly/application-monitoring-operator/build
+    to: application-monitoring-operator
 promotion:
-  name: application-monitoring-operator
-  namespace: integr8ly
+  to:
+  - name: application-monitoring-operator
+    namespace: integr8ly
 releases:
   initial:
     integration:

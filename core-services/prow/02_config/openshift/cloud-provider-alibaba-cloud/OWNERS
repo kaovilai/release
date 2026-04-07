@@ -7,10 +7,14 @@
 approvers:
 - elmiko
 - joelspeed
+- nrb
+- theobarberbany
 options: {}
 reviewers:
 - damdo
-- elmiko
-- joelspeed
-- odvarkadaniel
+- gujingit
+- mdbooth
+- nrb
+- racheljpg
 - radekmanak
+- theobarberbany
