@@ -6,6 +6,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -13,6 +14,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -104,6 +106,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -111,6 +114,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -192,6 +196,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -199,6 +204,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -280,6 +286,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -287,6 +294,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -368,6 +376,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -375,6 +384,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -466,6 +476,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -473,6 +484,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -564,6 +576,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -571,6 +584,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -652,6 +666,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -659,6 +674,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -740,6 +756,7 @@ periodics:
   decoration_config:
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-dev
@@ -747,6 +764,7 @@ periodics:
     repo: oadp-operator
     sparse_checkout_files:
     - Dockerfile
+    - build/Dockerfile.catalog
     - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws

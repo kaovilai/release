@@ -5,27 +5,28 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
-    context: ci/prow/4.18-ci-index
+    cluster: build03
+    context: ci/prow/4.18-ci-bundle-oadp-operator-bundle
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.18"
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-oadp-operator-oadp-1.6-4.18-ci-index
-    rerun_command: /test 4.18-ci-index
+    name: pull-ci-openshift-oadp-operator-oadp-1.6-4.18-ci-bundle-oadp-operator-bundle
+    rerun_command: /test 4.18-ci-bundle-oadp-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=oadp-operator-bundle
         - --variant=4.18
         command:
         - ci-operator
@@ -59,18 +60,19 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.18-ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.18-ci-bundle-oadp-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.18-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.18"
@@ -125,27 +127,28 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
-    context: ci/prow/4.22-ci-index
+    cluster: build03
+    context: ci/prow/4.22-ci-bundle-oadp-operator-bundle
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.22"
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-oadp-operator-oadp-1.6-4.22-ci-index
-    rerun_command: /test 4.22-ci-index
+    name: pull-ci-openshift-oadp-operator-oadp-1.6-4.22-ci-bundle-oadp-operator-bundle
+    rerun_command: /test 4.22-ci-bundle-oadp-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=oadp-operator-bundle
         - --variant=4.22
         command:
         - ci-operator
@@ -179,7 +182,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.22-ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.22-ci-bundle-oadp-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -191,6 +194,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -279,6 +283,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -367,6 +372,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -455,6 +461,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -537,12 +544,13 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.22-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.22"
@@ -603,6 +611,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -691,6 +700,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -773,27 +783,28 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
-    context: ci/prow/5.0-ci-index
+    cluster: build03
+    context: ci/prow/5.0-ci-bundle-oadp-operator-bundle
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "5.0"
       ci.openshift.io/generator: prowgen
       job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-oadp-operator-oadp-1.6-5.0-ci-index
-    rerun_command: /test 5.0-ci-index
+    name: pull-ci-openshift-oadp-operator-oadp-1.6-5.0-ci-bundle-oadp-operator-bundle
+    rerun_command: /test 5.0-ci-bundle-oadp-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=oadp-operator-bundle
         - --variant=5.0
         command:
         - ci-operator
@@ -827,7 +838,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )5.0-ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )5.0-ci-bundle-oadp-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -839,6 +850,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -927,6 +939,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1015,6 +1028,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1103,6 +1117,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1185,12 +1200,13 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
+    cluster: build03
     context: ci/prow/5.0-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - build/Dockerfile.catalog
       - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "5.0"
@@ -1302,7 +1318,7 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
+    cluster: build03
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
